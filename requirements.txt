@@ -1,0 +1,7 @@
+opencv-python
+numpy
+gradio
+plotly
+matplotlib
+scipy
+scikit-image
