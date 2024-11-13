@@ -1,3 +1,8 @@
+
+# TODO This is only needed if using a logitech webcam
+import os
+os.environ["OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS"] = "0"
+
 import cv2
 from threading import Thread, Lock
 import time
@@ -5,7 +10,7 @@ import logging
 
 class PiCamera:
     def __init__(self):
-        self.stream = cv2.VideoCapture(0)
+        self.stream = cv2.VideoCapture(1)
         self.lock = Lock()
         self.frame = None
         self._stopped = False
@@ -22,7 +27,7 @@ class PiCamera:
             if ret:
                 with self.lock:
                     self.frame = frame
-            time.sleep(0.03)  # ~30 FPS
+            time.sleep(0.01)  # ~30 FPS
             
     def get_frame(self):
         with self.lock:

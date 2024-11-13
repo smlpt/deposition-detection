@@ -15,7 +15,7 @@ def analysis_loop(camera, processor, analyzer):
         if frame is not None:
             hsv_frame = processor.to_hsv(frame)
             stats = processor.get_hsv_stats(hsv_frame)
-            analyzer.update(stats)
+            analyzer.update(stats, alpha=0.1)
         time.sleep(0.1)  # 10 Hz analysis rate
 
 def main():
@@ -23,7 +23,7 @@ def main():
     # Initialize components
     camera = PiCamera()
     processor = ImageProcessor()
-    analyzer = HSVAnalyzer()
+    analyzer = HSVAnalyzer(history_size=200)
     server = WebServer(camera, analyzer)
     
     # Start camera
