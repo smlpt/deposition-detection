@@ -18,3 +18,6 @@ class ImageProcessor:
             'v_m': np.mean(v),
             'v_std': np.std(v)
         }
+
+    # @staticmethod
+    # def mask_ellipse_contour()

@@ -23,7 +23,7 @@ def main():
     # Initialize components
     camera = PiCamera()
     processor = ImageProcessor()
-    analyzer = HSVAnalyzer(history_size=200)
+    analyzer = HSVAnalyzer()
     server = WebServer(camera, analyzer)
     
     # Start camera

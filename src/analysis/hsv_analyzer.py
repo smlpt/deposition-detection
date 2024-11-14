@@ -14,13 +14,12 @@ class HSVStats:
 
 class HSVAnalyzer:
     
-    def __init__(self, history_size=100):
+    def __init__(self):
         
         self.logger = logging.getLogger(__name__)
-        self.history_size = history_size
         
-        self.hsv_history = deque(maxlen=history_size)
-        self.timestamps = deque(maxlen=history_size)
+        self.hsv_history = []
+        self.timestamps = []
 
         self.ref_stats = None
         self.is_paused = False
@@ -32,8 +31,6 @@ class HSVAnalyzer:
         
         self.ref_stats = hsv_stats
         self.clear_history()
-        
-        
     
     def clear_history(self):
         """Clear all historical data"""
