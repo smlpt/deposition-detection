@@ -9,11 +9,12 @@ class ImageProcessor:
     @staticmethod
     def get_hsv_stats(hsv_frame):
         h, s, v = cv2.split(hsv_frame)
+        # Return the means and standard deviations
         return {
-            'h_mean': np.mean(h),
+            'h_m': np.mean(h),
             'h_std': np.std(h),
-            's_mean': np.mean(s),
+            's_m': np.mean(s),
             's_std': np.std(s),
-            'v_mean': np.mean(v),
+            'v_m': np.mean(v),
             'v_std': np.std(v)
         }
