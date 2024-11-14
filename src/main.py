@@ -13,9 +13,7 @@ def analysis_loop(camera, processor, analyzer):
     while True:
         frame = camera.get_frame()
         if frame is not None:
-            hsv_frame = processor.to_hsv(frame)
-            stats = processor.get_hsv_stats(hsv_frame)
-            analyzer.update(stats, alpha=0.05)
+            analyzer.update(frame, alpha=0.05)
         time.sleep(0.1)  # 10 Hz analysis rate
 
 def main():

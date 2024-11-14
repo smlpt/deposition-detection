@@ -6,6 +6,7 @@ import logging
 import time
 from threading import Lock, Event, Thread
 import cv2
+import numpy as np
 
 from camera.processor import ImageProcessor
 
@@ -25,13 +26,14 @@ class WebServer:
     def set_new_reference(self):
         frame = self.camera.get_frame()
         if frame is not None:
-            hsv_frame = ImageProcessor.to_hsv(frame)
-            stats = ImageProcessor.get_hsv_stats(hsv_frame)
-            self.analyzer.set_reference(stats)
+            self.analyzer.set_reference(frame)
             
     def update_history_window(self, new_window):
         """Update the history window size (in seconds)"""
         self.history_window = int(new_window)
+        
+    def set_ellipse_fitting(self, value):
+        self.analyzer.set_ellipse_masking(value)
         
     def create_plots(self):
         with self.lock:
@@ -60,11 +62,22 @@ class WebServer:
         return fig
         
     def show_frame(self):
-            frame = self.camera.get_frame()
-            if frame is not None:
-                return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            else:
-                return None
+        frame = self.camera.get_frame()
+        if frame is not None:
+            if self.analyzer.current_ellipse is not None:
+                # Draw the ellipse on the frame
+                cv2.ellipse(frame, self.analyzer.current_ellipse, (0, 255, 0), 2)
+
+                # Add the score to the frame
+                try:
+                    text = f"Ellipse Score: {self.analyzer.ellipse_score:.2f}"
+                except:
+                    self.logger.info(f"Found illegal score: {self.analyzer.ellipse_score}")
+                cv2.putText(frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (36, 255, 12), 2)
+
+            return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        else:
+            return None
             
     def shutdown(self):
         self.should_stop = True
@@ -78,10 +91,14 @@ class WebServer:
             with gr.Row():
                 gr.Plot(self.create_plots, every=0.1)
             with gr.Row():
-                history_size = gr.Number(20, label="History in seconds", precision=0, minimum=1, maximum=300)
+                
+                toggle_ellipse = gr.Checkbox(True, label="Enable ellipsoid masking")
+                toggle_ellipse.change(fn=self.set_ellipse_fitting, inputs=[toggle_ellipse])
+                
+                history_size = gr.Number(60, label="History in seconds", precision=0, minimum=1, maximum=300)
                 history_size.change(fn=self.update_history_window, inputs=[history_size])
             with gr.Row():
-                frame = gr.Image(self.show_frame, every=0.01)
+                frame = gr.Image(self.show_frame, every=0.03)
             with gr.Row():
                 pause_btn = gr.Button("Pause Analysis")
                 ref_btn = gr.Button("Set New Reference")

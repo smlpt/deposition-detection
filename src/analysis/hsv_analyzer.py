@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 import time
 import logging
 
+from camera.processor import ImageProcessor
+
 @dataclass
 class HSVStats:
     h_m: float = 0.0
@@ -24,25 +26,52 @@ class HSVAnalyzer:
         self.ref_stats = None
         self.is_paused = False
         
-    def set_reference(self, hsv_stats):
-        """Set new reference values and clear history"""
+        self.current_mask = None
+        self.current_ellipse = None
+        self.ellipse_score = None
+        self.is_ellipse_enabled = True
         
-        self.logger.info("Set new reference frame.")
+    def set_reference(self, frame):
+        """Set new reference values from a frame and clear history"""
+        self.logger.info("Setting new reference frame.")
         
-        self.ref_stats = hsv_stats
+        # Convert to HSV
+        hsv_frame = ImageProcessor.to_hsv(frame)
+        
+        if self.is_ellipse_enabled:
+            # Find ellipse and create mask
+            self.current_mask, self.current_ellipse, self.ellipse_score = ImageProcessor.mask_ellipse_contour(frame)
+        else:
+            self.current_mask = None
+            self.current_ellipse = None
+        
+        # Calculate stats using the mask
+        self.ref_stats = ImageProcessor.get_hsv_stats(hsv_frame, self.current_mask)
         self.clear_history()
-    
+        
+        if self.current_ellipse is not None:
+            self.logger.info(f"Found reference ellipse at {self.current_ellipse[0]} with size {self.current_ellipse[1]}")
+        
     def clear_history(self):
         """Clear all historical data"""
         
         self.hsv_history.clear()
         
-    def update(self, hsv_stats, alpha):
-        """Update with new stats relative to reference frame"""
-        
+    def update(self, frame, alpha):
+        """Update with new frame relative to reference frame"""
         if self.is_paused:
             return
             
+        # Convert to HSV
+        hsv_frame = ImageProcessor.to_hsv(frame)
+        
+        if self.is_ellipse_enabled:
+            # Update mask
+            self.current_mask, self.current_ellipse, self.ellipse_score = ImageProcessor.mask_ellipse_contour(frame)
+        
+        # Calculate stats using the mask
+        hsv_stats = ImageProcessor.get_hsv_stats(hsv_frame, self.current_mask)
+        
         if self.ref_stats is None:
             self.ref_stats = hsv_stats
         
@@ -62,7 +91,14 @@ class HSVAnalyzer:
     def toggle_pause(self):
         self.is_paused = not self.is_paused
         return "Resume Analysis" if self.is_paused else "Pause Analysis"
-        
+    
+    def set_ellipse_masking(self, value):
+        self.logger.info(f"Ellipse fitting was {"enabled" if value else "disabled"}.")
+        self.is_ellipse_enabled = value
+        if not value:
+            self.current_ellipse = None
+            self.current_mask = None
+            
     def get_history(self):
         return {
             'timestamps': list(self.timestamps),
