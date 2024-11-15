@@ -23,7 +23,7 @@ def main():
     processor = ImageProcessor()
     analyzer = HSVAnalyzer()
     server = WebServer(camera, analyzer)
-    
+    server.find_camera_devices()
     # Start camera
     camera.start()
     

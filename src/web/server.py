@@ -8,6 +8,7 @@ from threading import Lock, Event, Thread
 import cv2
 import numpy as np
 
+from camera.camera import PiCamera
 from camera.processor import ImageProcessor
 
 class WebServer:
@@ -19,6 +20,8 @@ class WebServer:
         self.should_stop = False
         self.history_window = 60 # default is a minute
         self.logger = logging.getLogger(__name__)
+        self.cameras = None
+        self.camera_names = None
         
     def toggle_pause(self):
         return self.analyzer.toggle_pause()
@@ -37,6 +40,18 @@ class WebServer:
         
     def set_ellipse_fitting(self, value):
         self.analyzer.set_ellipse_masking(value)
+        
+    def switch_camera(self, device_name):
+        """Handle camera switch from dropdown"""
+        # Extract device index from the name (e.g., "Camera 0" -> 0)
+        device_index = int(device_name.split()[-1])
+        self.camera.switch_camera(device_index)
+        return None  # Return None to clear the current frame while switching
+    
+    def find_camera_devices(self):
+        # Get list of available cameras
+        self.cameras = self.camera.list_cameras()
+        self.camera_names = [f"Camera {cam['index']}" for cam in self.cameras]
         
     def create_plots(self):
         with self.lock:
@@ -90,14 +105,19 @@ class WebServer:
     def launch(self):
         self.logger.info("Launching webserver...")
         self.set_new_reference()
+        
         with gr.Blocks() as demo:
             with gr.Row():
                 gr.Plot(self.create_plots, every=0.1)
             with gr.Row():
                 frame = gr.Image(self.show_frame, every=0.03)
             with gr.Row():
-                
                 with gr.Column():
+                    camera_select = gr.Dropdown(
+                        choices=self.camera_names,
+                        value=self.camera_names[0] if self.camera_names else None,
+                        label="Select Camera"
+                    )
                     toggle_ellipse = gr.Checkbox(True, label="Enable ellipsoid masking")
                     toggle_ellipse.change(fn=self.set_ellipse_fitting, inputs=[toggle_ellipse])
                 
@@ -111,6 +131,11 @@ class WebServer:
                     ref_btn = gr.Button("Set New Reference")
                     close_btn = gr.Button("Close")
                 
+            camera_select.change(
+                fn=self.switch_camera,
+                inputs=[camera_select],
+                outputs=[frame]
+            )
             freeze_btn.click(self.freeze_mask, outputs=freeze_btn)
             pause_btn.click(self.toggle_pause, outputs=pause_btn)
             ref_btn.click(self.set_new_reference)
