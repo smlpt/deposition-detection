@@ -6,7 +6,7 @@ This project aims to create an easy to use interface for monitoring and controll
 
 The interface consists of a webserver that currently performs the following tasks:
 - capture a real-time webcam or Raspberry Pi camera feed
-- perform edge detection and ellipsoid fitting to find the region of interest: in our case this is a cylindrical well
+- perform edge detection and ellipsoid fitting to find the region of interest: in our case this is a cylindrical fluid container
 - capture a reference frame and calculate the relative HSV data for each subsequently captured frame
 - plot the HSV history in a user defined range
 
@@ -17,7 +17,7 @@ The interface consists of a webserver that currently performs the following task
 1. Clone this project with `git clone https://github.com/smlpt/deposition-detection`
 2. Create a virtual Python environment somewhere on your file system, activate it and install the project dependencies from `requirements.txt` with `pip install -r requirements.txt`
 3. Ensure that a webcam is connected to your computer
-4. `cd` into the project and run `python main.py`
+4. `cd` into the project `src` and run `python main.py`
 5. Open `http://localhost:7860/` in a browser to access the interface
 
 ## Installation on a Raspberry Pi
