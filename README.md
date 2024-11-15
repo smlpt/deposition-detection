@@ -6,7 +6,7 @@ This project aims to create an easy to use interface for monitoring and controll
 
 The interface consists of a webserver that currently performs the following tasks:
 - capture a real-time webcam or Raspberry Pi camera feed
-- perform edge detection and ellipsoid fitting to find the region of interest: in our case this is a cylindrical fluid container
+- perform edge detection and ellipsoid fitting to find the region of interest: in our case this is a cylindrical container
 - capture a reference frame and calculate the relative HSV data for each subsequently captured frame
 - plot the HSV history in a user defined range
 
