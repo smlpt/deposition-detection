@@ -30,6 +30,7 @@ class HSVAnalyzer:
         self.current_ellipse = None
         self.ellipse_score = None
         self.is_ellipse_enabled = True
+        self.is_mask_frozen = False
         
     def set_reference(self, frame):
         """Set new reference values from a frame and clear history"""
@@ -39,8 +40,9 @@ class HSVAnalyzer:
         hsv_frame = ImageProcessor.to_hsv(frame)
         
         if self.is_ellipse_enabled:
-            # Find ellipse and create mask
-            self.current_mask, self.current_ellipse, self.ellipse_score = ImageProcessor.mask_ellipse_contour(frame)
+            # Find ellipse and create mask only if  we didn't freeze the existing one
+            if not self.is_mask_frozen:
+                self.current_mask, self.current_ellipse, self.ellipse_score = ImageProcessor.mask_ellipse_contour(frame)
         else:
             self.current_mask = None
             self.current_ellipse = None
@@ -65,7 +67,7 @@ class HSVAnalyzer:
         # Convert to HSV
         hsv_frame = ImageProcessor.to_hsv(frame)
         
-        if self.is_ellipse_enabled:
+        if self.is_ellipse_enabled and not self.is_mask_frozen:
             # Update mask
             self.current_mask, self.current_ellipse, self.ellipse_score = ImageProcessor.mask_ellipse_contour(frame)
         
@@ -91,6 +93,10 @@ class HSVAnalyzer:
     def toggle_pause(self):
         self.is_paused = not self.is_paused
         return "Resume Analysis" if self.is_paused else "Pause Analysis"
+    
+    def freeze_mask(self):
+        self.is_mask_frozen = not self.is_mask_frozen
+        return "Unfreeze Mask" if self.is_mask_frozen else "Freeze Mask"
     
     def set_ellipse_masking(self, value):
         self.logger.info(f"Ellipse fitting was {"enabled" if value else "disabled"}.")

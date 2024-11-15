@@ -23,6 +23,9 @@ class WebServer:
     def toggle_pause(self):
         return self.analyzer.toggle_pause()
     
+    def freeze_mask(self):
+        return self.analyzer.freeze_mask()
+    
     def set_new_reference(self):
         frame = self.camera.get_frame()
         if frame is not None:
@@ -54,7 +57,7 @@ class WebServer:
         fig.add_trace(go.Scatter(y=get_recent(history['v_decay']), name="Averaged V", line=dict(color="#be398d")))
         
         fig.update_layout(
-            title=f"HSV Values (Last {self.history_window} seconds)",
+            title=f"Relative HSV Changes (Last {self.history_window} seconds)",
             xaxis_title="Samples",
             yaxis_title="Value"
         )
@@ -91,19 +94,24 @@ class WebServer:
             with gr.Row():
                 gr.Plot(self.create_plots, every=0.1)
             with gr.Row():
-                
-                toggle_ellipse = gr.Checkbox(True, label="Enable ellipsoid masking")
-                toggle_ellipse.change(fn=self.set_ellipse_fitting, inputs=[toggle_ellipse])
-                
-                history_size = gr.Number(60, label="History in seconds", precision=0, minimum=1, maximum=300)
-                history_size.change(fn=self.update_history_window, inputs=[history_size])
-            with gr.Row():
                 frame = gr.Image(self.show_frame, every=0.03)
             with gr.Row():
-                pause_btn = gr.Button("Pause Analysis")
-                ref_btn = gr.Button("Set New Reference")
-                close_btn = gr.Button("Close")
                 
+                with gr.Column():
+                    toggle_ellipse = gr.Checkbox(True, label="Enable ellipsoid masking")
+                    toggle_ellipse.change(fn=self.set_ellipse_fitting, inputs=[toggle_ellipse])
+                
+                    freeze_btn = gr.Button("Freeze Mask")
+                    
+                    history_size = gr.Number(60, label="History in seconds", precision=0, minimum=1, maximum=300)
+                    history_size.change(fn=self.update_history_window, inputs=[history_size])
+                    
+                with gr.Column():
+                    pause_btn = gr.Button("Pause Analysis")
+                    ref_btn = gr.Button("Set New Reference")
+                    close_btn = gr.Button("Close")
+                
+            freeze_btn.click(self.freeze_mask, outputs=freeze_btn)
             pause_btn.click(self.toggle_pause, outputs=pause_btn)
             ref_btn.click(self.set_new_reference)
             close_btn.click(self.shutdown)
