@@ -99,7 +99,7 @@ class HSVAnalyzer:
         return "Unfreeze Mask" if self.is_mask_frozen else "Freeze Mask"
     
     def set_ellipse_masking(self, value):
-        self.logger.info(f"Ellipse fitting was {"enabled" if value else "disabled"}.")
+        self.logger.info(f"Ellipse fitting was {'enabled' if value else 'disabled'}.")
         self.is_ellipse_enabled = value
         if not value:
             self.current_ellipse = None
