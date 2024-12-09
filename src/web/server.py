@@ -107,19 +107,6 @@ class WebServer:
         self.logger.info("Launching webserver...")
         self.set_new_reference()
         
-        css = """
-        .gradio-container {
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        .gradio-container > .app {
-            flex-grow: 1;
-            overflow: auto;
-        }
-        """
-
         with gr.Blocks(theme=gr.themes.Soft()) as demo:
             with gr.Row():
                 gr.Plot(self.create_plots, every=0.1, scale=2, show_label=False)
@@ -139,7 +126,6 @@ class WebServer:
                 history_size = gr.Number(60, label="History in seconds", precision=0, minimum=1, maximum=300)
                 history_size.change(fn=self.update_history_window, inputs=[history_size])
                 close_btn = gr.Button("Close")
-            
                 
             camera_select.change(
                 fn=self.switch_camera,
