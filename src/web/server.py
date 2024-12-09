@@ -74,7 +74,8 @@ class WebServer:
         fig.update_layout(
             title=f"Relative HSV Changes (Last {self.history_window} seconds)",
             xaxis_title="Samples",
-            yaxis_title="Value"
+            yaxis_title="Value",
+            legend=dict(yanchor="bottom", orientation="h", y=1)
         )
         
         return fig
@@ -106,30 +107,39 @@ class WebServer:
         self.logger.info("Launching webserver...")
         self.set_new_reference()
         
-        with gr.Blocks() as demo:
+        css = """
+        .gradio-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .gradio-container > .app {
+            flex-grow: 1;
+            overflow: auto;
+        }
+        """
+
+        with gr.Blocks(theme=gr.themes.Soft()) as demo:
             with gr.Row():
-                gr.Plot(self.create_plots, every=0.1)
+                gr.Plot(self.create_plots, every=0.1, scale=2, show_label=False)
+                frame = gr.Image(self.show_frame, every=0.03, scale=1, show_label=False)
             with gr.Row():
-                frame = gr.Image(self.show_frame, every=0.03)
-            with gr.Row():
-                with gr.Column():
-                    camera_select = gr.Dropdown(
-                        choices=self.camera_names,
-                        value=self.camera_names[0] if self.camera_names else None,
-                        label="Select Camera"
-                    )
-                    toggle_ellipse = gr.Checkbox(True, label="Enable ellipsoid masking")
-                    toggle_ellipse.change(fn=self.set_ellipse_fitting, inputs=[toggle_ellipse])
+                pause_btn = gr.Button("Pause Analysis")
+                ref_btn = gr.Button("Set New Reference")
+                freeze_btn = gr.Button("Freeze Mask")
+                camera_select = gr.Dropdown(
+                    choices=self.camera_names,
+                    value=self.camera_names[0] if self.camera_names else None,
+                    label="Select Camera"
+                )
+                toggle_ellipse = gr.Checkbox(True, label="Enable ellipsoid masking")
+                toggle_ellipse.change(fn=self.set_ellipse_fitting, inputs=[toggle_ellipse])
                 
-                    freeze_btn = gr.Button("Freeze Mask")
-                    
-                    history_size = gr.Number(60, label="History in seconds", precision=0, minimum=1, maximum=300)
-                    history_size.change(fn=self.update_history_window, inputs=[history_size])
-                    
-                with gr.Column():
-                    pause_btn = gr.Button("Pause Analysis")
-                    ref_btn = gr.Button("Set New Reference")
-                    close_btn = gr.Button("Close")
+                history_size = gr.Number(60, label="History in seconds", precision=0, minimum=1, maximum=300)
+                history_size.change(fn=self.update_history_window, inputs=[history_size])
+                close_btn = gr.Button("Close")
+            
                 
             camera_select.change(
                 fn=self.switch_camera,
