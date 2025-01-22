@@ -30,6 +30,14 @@ class WebServer:
         return self.analyzer.freeze_mask()
     
     def set_new_reference(self):
+        if self.camera.stored_settings is None:
+            self.camera.freeze_current_settings()
+        else:
+            # Re-apply stored settings to ensure they haven't been changed
+            self.apply_settings(self.stored_settings)
+        
+        # Wait a couple frames for settings to take effect
+        time.sleep(0.1)
         frame = self.camera.get_frame()
         if frame is not None:
             self.analyzer.set_reference(frame)
