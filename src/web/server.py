@@ -138,4 +138,4 @@ class WebServer:
             close_btn.click(self.shutdown)
             
         # self.should_stop = True
-        demo.launch(server_name='localhost', show_api=False)
+        demo.launch(server_name='0.0.0.0', show_api=False)

@@ -15,17 +15,16 @@ The interface consists of a webserver that currently performs the following task
 ## Installation on a desktop computer/laptop
 
 1. Clone this project with `git clone https://github.com/smlpt/deposition-detection`
-2. Create a virtual Python environment somewhere on your file system, activate it and install the project dependencies from `requirements.txt` with `pip install -r requirements.txt`
-3. Ensure that a webcam is connected to your computer
-4. `cd` into the project `src` and run `python main.py`
-5. Open `http://localhost:7860/` in a browser to access the interface
+2. Ensure that a webcam is connected to your computer
+3. On Windows: launch `launch_server_windows.bat` to launch the server. This will also automatically set up a virtual environment with the required packages on first launch.
+On Linux, make the shell script executable by running `chmod +x run_project.sh` and then launch `./launch_server_linux.sh`.
+4. Open `http://localhost:7860/` in a browser to access the interface
+5. To stop the server, hit the "close" button in the GUI, or press Ctrl+C in the console.
 
 ## Installation on a Raspberry Pi
 
-> This part needs more testing and might not work yet
-
 1. Clone this project with `git clone https://github.com/smlpt/deposition-detection`
-2. Create a virtual Python environment somewhere on your file system, activate it and install the project dependencies from `requirements.txt` with `pip install -r requirements.txt`
-3. Ensure that either a webcam or the Raspberry Pi camera is connected to your Raspberry Pi
-4. `cd` into the project and run `python main.py`
-5. Open `http://<raspberry-pi-ip>:7860` in a browser to access the interface. To find the IP address of the Raspberry Pi, you either have to go looking in your Router, or you connect a display and a keyboard and find the IP via `ifconfig`.
+2. Ensure that either a webcam or the Raspberry Pi camera is connected to your Raspberry Pi
+3. Make the shell script executable by running `chmod +x run_project.sh` and then launch `./launch_server_linux.sh`. This will also automatically set up a virtual environment with the required packages on first launch.
+4. Open `http://<raspberry-pi-ip>:7860` in a browser to access the interface. To find the IP address of the Raspberry Pi, you either have to go looking in your Router, or you connect a display and a keyboard and find the IP via `ifconfig`.
+5. To stop the server, hit the "close" button in the GUI, or press Ctrl+C in the console.
