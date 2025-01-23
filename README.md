@@ -10,6 +10,10 @@ The interface consists of a webserver that currently performs the following task
 - capture a reference frame and calculate the relative HSV data for each subsequently captured frame
 - plot the HSV history in a user defined range
 
+> [!Important]
+> Manual exposure and white balance values were only tested on a Raspberry Pi Ubuntu system with a Logitech C920. Other devices are currently not supported.
+
+> [!Note]
 > **This is a work in progress. There will be bugs. Some things will not work as intended. Feel free to poke around in the code and submit a PR if you want to help fix things.**
 
 ## Installation on a desktop computer/laptop

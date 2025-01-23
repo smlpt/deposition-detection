@@ -18,58 +18,27 @@ class PiCamera:
         self.frame = None
         self._stopped = False
         self.device_path = f"/dev/video{device_index}"
-        self.stored_settings = None
-        
+        self.exposure_index = 1
+        # This range of exposures is suitable for a Logitech C920 webcam
+        self.exposures = [5, 10, 20, 39, 78, 156, 312, 625, 1250, 2047]
+        self.wb = 4000
         self.logger = logging.getLogger(__name__)
-
-    def get_current_settings(self):
-        """Get current camera settings"""
-        result = subprocess.run(
-            ['v4l2-ctl', '-d', self.device_path, '--get-ctrl=exposure_absolute,white_balance_temperature'],
-            capture_output=True, text=True
-        )
-        
-        settings = {}
-        for line in result.stdout.splitlines():
-            name, value = line.split(":")
-            settings[name.strip()] = int(value.strip())
-            
-        return settings
     
-    def apply_settings(self, settings):
-        """Apply stored settings to camera"""
-        subprocess.run(['v4l2-ctl', '-d', self.device_path, '-c', 'exposure_auto=1'])
-        subprocess.run(['v4l2-ctl', '-d', self.device_path, '-c', 
-                       f'exposure_absolute={settings["exposure_absolute"]}'])
-        
-        subprocess.run(['v4l2-ctl', '-d', self.device_path, '-c', 'white_balance_temperature_auto=0'])
-        subprocess.run(['v4l2-ctl', '-d', self.device_path, '-c', 
-                       f'white_balance_temperature={settings["white_balance_temperature"]}'])
+    def apply_settings(self):
+        """Apply stored exposure and white balance to camera"""
+        self.logger.info("Applying camera settings: exposure=%d, white_balance=%d", self.exposure_index, self.wb)
+        subprocess.run(['v4l2-ctl', '-d', self.device_path, '-c', 'auto_exposure=1'])
+        subprocess.run(['v4l2-ctl', '-d', self.device_path, '-c', 'exposure_dynamic_framerate=0'])
+        subprocess.run(['v4l2-ctl', '-d', self.device_path, '-c', 'gain=0'])
+        subprocess.run(['v4l2-ctl', '-d', self.device_path, '-c', f'exposure_time_absolute={self.exposures[self.exposure_index]}'])
+        subprocess.run(['v4l2-ctl', '-d', self.device_path, '-c', 'white_balance_automatic=0'])
+        subprocess.run(['v4l2-ctl', '-d', self.device_path, '-c', f'white_balance_temperature={self.wb}'])
         
     def enable_auto_settings(self):
         """Enable automatic camera adjustments"""
-        subprocess.run(['v4l2-ctl', '-d', self.device_path, '-c', 'exposure_auto=3'])
-        subprocess.run(['v4l2-ctl', '-d', self.device_path, '-c', 'white_balance_temperature_auto=1'])
-        
-    def freeze_current_settings(self, frames_to_wait=5):
-        """Wait for auto settings to settle and then freeze them"""
-        self.enable_auto_settings()
-        
-        # Wait for specified number of frames
-        for _ in range(frames_to_wait):
-            with self.lock:
-                if self.frame is None:
-                    raise RuntimeError("No frames available")
-            time.sleep(0.1)
-        
-        # Capture and store the current settings
-        self.stored_settings = self.get_current_settings()
-        
-        # Apply these settings manually
-        self.apply_settings(self.stored_settings)
-        
-        self.logger.info(f"Camera settings frozen at: {self.stored_settings}")
-        return self.stored_settings
+        subprocess.run(['v4l2-ctl', '-d', self.device_path, '-c', 'auto_exposure=3'])
+        subprocess.run(['v4l2-ctl', '-d', self.device_path, '-c', 'white_balance_automatic=1'])
+        subprocess.run(['v4l2-ctl', '-d', self.device_path, '-c', 'exposure_dynamic_framerate=1'])
         
     def list_cameras(self):
         """List all available camera devices"""
@@ -94,12 +63,9 @@ class PiCamera:
         if not self.stream.isOpened():
             raise RuntimeError(f"Failed to open camera at index {self.device_index}")
         
-        # Start with auto settings enabled
-        self.enable_auto_settings()
-
         Thread(target=self._capture_loop, daemon=True).start()
         self.logger.info(f"Started camera thread for device {self.device_index}")
-        
+
     def switch_camera(self, new_index):
         """Switch to a different camera device"""
         self.stop()

@@ -30,14 +30,7 @@ class WebServer:
         return self.analyzer.freeze_mask()
     
     def set_new_reference(self):
-        if self.camera.stored_settings is None:
-            self.camera.freeze_current_settings()
-        else:
-            # Re-apply stored settings to ensure they haven't been changed
-            self.apply_settings(self.stored_settings)
-        
-        # Wait a couple frames for settings to take effect
-        time.sleep(0.1)
+    
         frame = self.camera.get_frame()
         if frame is not None:
             self.analyzer.set_reference(frame)
@@ -123,6 +116,7 @@ class WebServer:
                 pause_btn = gr.Button("Pause Analysis")
                 ref_btn = gr.Button("Set New Reference")
                 freeze_btn = gr.Button("Freeze Mask")
+                close_btn = gr.Button("Close")
                 camera_select = gr.Dropdown(
                     choices=self.camera_names,
                     value=self.camera_names[0] if self.camera_names else None,
@@ -133,7 +127,45 @@ class WebServer:
                 
                 history_size = gr.Number(60, label="History in seconds", precision=0, minimum=1, maximum=300)
                 history_size.change(fn=self.update_history_window, inputs=[history_size])
-                close_btn = gr.Button("Close")
+                
+                manual_exposure = gr.Checkbox(False, label="Manual Exposure")
+                exposure_val = gr.Number(
+                    value=0, 
+                    label="Exposure Time", 
+                    precision=0,
+                    minimum=-4,
+                    maximum=4,
+                    step=1
+                )
+                wb_val = gr.Number(
+                    value=4000,
+                    label="White Balance Temperature (K)",
+                    precision=0,
+                    minimum=2800,
+                    maximum=7500,
+                    step=100
+                )
+
+            def update_camera_settings(manual, exp, wb):
+                if manual:
+                    self.camera.exposure_index = np.clip(exp + 4, 0, 9)
+                    self.camera.wb = np.clip(wb, 2800, 7500)
+                    self.camera.apply_settings()
+                else:
+                    self.camera.enable_auto_settings()
+                
+            manual_exposure.change(
+                fn=update_camera_settings,
+                inputs=[manual_exposure, exposure_val, wb_val]
+            )
+            exposure_val.change(
+                fn=update_camera_settings,
+                inputs=[manual_exposure, exposure_val, wb_val]
+            )
+            wb_val.change(
+                fn=update_camera_settings, 
+                inputs=[manual_exposure, exposure_val, wb_val]
+            )
                 
             camera_select.change(
                 fn=self.switch_camera,

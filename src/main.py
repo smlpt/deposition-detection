@@ -26,12 +26,6 @@ def main():
     server.find_camera_devices()
     # Start camera
     camera.start()
-
-    # Let auto settings settle and freeze them
-    try:
-        camera.freeze_current_settings(frames_to_wait=5)
-    except Exception as e:
-        camera.logger.error(f"Failed to freeze camera settings: {e}")
     
     logger.info("Initialized camera, processor, analyser and server.")
     
