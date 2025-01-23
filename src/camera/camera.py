@@ -26,7 +26,7 @@ class PiCamera:
     
     def apply_settings(self):
         """Apply stored exposure and white balance to camera"""
-        self.logger.info("Applying camera settings: exposure=%d, white_balance=%d", self.exposure_index, self.wb)
+        self.logger.debug("Applying camera settings: exposure=%d, white_balance=%d", self.exposure_index, self.wb)
         subprocess.run(['v4l2-ctl', '-d', self.device_path, '-c', 'auto_exposure=1'])
         subprocess.run(['v4l2-ctl', '-d', self.device_path, '-c', 'exposure_dynamic_framerate=0'])
         subprocess.run(['v4l2-ctl', '-d', self.device_path, '-c', 'gain=0'])
