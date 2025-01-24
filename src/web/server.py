@@ -131,7 +131,7 @@ class WebServer:
                 manual_exposure = gr.Checkbox(False, label="Manual Exposure")
                 exposure_val = gr.Number(
                     value=0, 
-                    label="Exposure Time", 
+                    label="Exposure Correction", 
                     precision=0,
                     minimum=-4,
                     maximum=4,

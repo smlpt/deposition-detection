@@ -16,6 +16,9 @@ The interface consists of a webserver that currently performs the following task
 > [!Note]
 > **This is a work in progress. There will be bugs. Some things will not work as intended. Feel free to poke around in the code and submit a PR if you want to help fix things.**
 
+![Screenshot of the WebUI](webui_screenshot.jpg)
+*Screenshot of the Gradio-based Web UI.*
+
 ## Installation on a desktop computer/laptop
 
 1. Clone this project with `git clone https://github.com/smlpt/deposition-detection`
