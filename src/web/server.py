@@ -7,6 +7,7 @@ import time
 from threading import Lock, Event, Thread
 import cv2
 import numpy as np
+import pandas as pd
 
 from camera.camera import PiCamera
 from camera.processor import ImageProcessor
@@ -71,7 +72,7 @@ class WebServer:
         fig.add_trace(go.Scatter(y=get_recent(history['h_decay']), name="Averaged H", line=dict(color="#7aaa28")))
         fig.add_trace(go.Scatter(y=get_recent(history['s_decay']), name="Averaged S", line=dict(color="#398dbe")))
         fig.add_trace(go.Scatter(y=get_recent(history['v_decay']), name="Averaged V", line=dict(color="#be398d")))
-        
+
         fig.update_layout(
             title=f"Relative HSV Changes (Last {self.history_window} seconds)",
             xaxis_title="Samples",
@@ -80,6 +81,62 @@ class WebServer:
         )
         
         return fig
+    
+    def export_csv(self):
+        with self.lock:
+            history = self.analyzer.get_history()
+            
+        samples_per_second = 10
+        window_size = int(self.history_window * samples_per_second)
+        
+        def get_recent(data):
+            return data[-window_size:] if len(data) > window_size else data
+        
+            # Get recent data
+        timestamps = get_recent(history['timestamps'])
+        h_means = get_recent(history['h_means'])
+        s_means = get_recent(history['s_means'])
+        v_means = get_recent(history['v_means'])
+        h_decay = get_recent(history['h_decay'])
+        s_decay = get_recent(history['s_decay'])
+        v_decay = get_recent(history['v_decay'])
+    
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            import csv
+            from datetime import datetime
+            
+            # Create root window and hide it
+            root = tk.Tk()
+            root.withdraw()
+            
+            # Open file dialog
+            file_path = filedialog.asksaveasfilename(
+                defaultextension='.csv',
+                filetypes=[('CSV files', '*.csv')],
+                title='Export HSV Data'
+            )
+            
+            if file_path:
+                with open(file_path, 'w', newline='') as csvfile:
+                    writer = csv.writer(csvfile)
+                    # Write header
+                    writer.writerow(['Timestamp', 
+                                'H_Measured', 'S_Measured', 'V_Measured',
+                                'H_Averaged', 'S_Averaged', 'V_Averaged'])
+                    
+                    # Write data rows
+                    for i in range(len(h_means)):
+                        writer.writerow([timestamps[i],
+                                    h_means[i], s_means[i], v_means[i],
+                                    h_decay[i], s_decay[i], v_decay[i]])  
+                        
+                gr.Info(f"Exported CSV to {file_path}", 4)
+                
+        except Exception as e:
+            print(f"Error exporting CSV: {str(e)}")
+            gr.Warning("Error exporting CSV", 4)
         
     def show_frame(self):
         frame = self.camera.get_frame()
@@ -116,6 +173,7 @@ class WebServer:
                 pause_btn = gr.Button("Pause Analysis")
                 ref_btn = gr.Button("Set New Reference")
                 freeze_btn = gr.Button("Freeze Mask")
+                export_btn = gr.Button("Export CSV")
                 close_btn = gr.Button("Close")
                 camera_select = gr.Dropdown(
                     choices=self.camera_names,
@@ -125,7 +183,7 @@ class WebServer:
                 toggle_ellipse = gr.Checkbox(True, label="Enable ellipsoid masking")
                 toggle_ellipse.change(fn=self.set_ellipse_fitting, inputs=[toggle_ellipse])
                 
-                history_size = gr.Number(60, label="History in seconds", precision=0, minimum=1, maximum=300)
+                history_size = gr.Number(60, label="History in seconds", precision=0, minimum=1, maximum=1200)
                 history_size.change(fn=self.update_history_window, inputs=[history_size])
                 
                 manual_exposure = gr.Checkbox(False, label="Manual Exposure")
@@ -175,6 +233,7 @@ class WebServer:
             freeze_btn.click(self.freeze_mask, outputs=freeze_btn)
             pause_btn.click(self.toggle_pause, outputs=pause_btn)
             ref_btn.click(self.set_new_reference)
+            export_btn.click(self.export_csv)
             close_btn.click(self.shutdown)
             
         # self.should_stop = True

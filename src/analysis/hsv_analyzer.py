@@ -1,6 +1,6 @@
 from collections import deque
 from dataclasses import dataclass, field
-import time
+import datetime
 import logging
 
 from camera.processor import ImageProcessor
@@ -88,7 +88,7 @@ class HSVAnalyzer:
         )
         
         self.hsv_history.append(relative_stats)
-        self.timestamps.append(time.time())
+        self.timestamps.append(datetime.datetime.now().strftime('%H:%M:%S.%f'))
     
     def toggle_pause(self):
         self.is_paused = not self.is_paused
