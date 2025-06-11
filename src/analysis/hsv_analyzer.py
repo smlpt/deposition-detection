@@ -16,7 +16,7 @@ class HSVStats:
 
 class HSVAnalyzer:
     
-    def __init__(self):
+    def __init__(self, processor: ImageProcessor):
         
         self.logger = logging.getLogger(__name__)
         
@@ -31,24 +31,26 @@ class HSVAnalyzer:
         self.ellipse_score = None
         self.is_ellipse_enabled = True
         self.is_mask_frozen = False
+
+        self.processor = processor
         
     def set_reference(self, frame):
         """Set new reference values from a frame and clear history"""
         self.logger.info("Setting new reference frame.")
         
         # Convert to HSV
-        hsv_frame = ImageProcessor.to_hsv(frame)
+        hsv_frame = self.processor.to_hsv(frame)
         
         if self.is_ellipse_enabled:
             # Find ellipse and create mask only if  we didn't freeze the existing one
             if not self.is_mask_frozen:
-                self.current_mask, self.current_ellipse, self.ellipse_score = ImageProcessor.mask_ellipse_contour(frame)
+                self.current_mask, self.current_ellipse, self.ellipse_score = self.processor.mask_ellipse_contour(frame)
         else:
             self.current_mask = None
             self.current_ellipse = None
         
         # Calculate stats using the mask
-        self.ref_stats = ImageProcessor.get_hsv_stats(hsv_frame, self.current_mask)
+        self.ref_stats = self.processor.get_hsv_stats(hsv_frame, self.current_mask)
         self.clear_history()
         
         if self.current_ellipse is not None:
@@ -65,14 +67,14 @@ class HSVAnalyzer:
             return
             
         # Convert to HSV
-        hsv_frame = ImageProcessor.to_hsv(frame)
+        hsv_frame = self.processor.to_hsv(frame)
         
         if self.is_ellipse_enabled and not self.is_mask_frozen:
             # Update mask
-            self.current_mask, self.current_ellipse, self.ellipse_score = ImageProcessor.mask_ellipse_contour(frame)
+            self.current_mask, self.current_ellipse, self.ellipse_score = self.processor.mask_ellipse_contour(frame)
         
         # Calculate stats using the mask
-        hsv_stats = ImageProcessor.get_hsv_stats(hsv_frame, self.current_mask)
+        hsv_stats = self.processor.get_hsv_stats(hsv_frame, self.current_mask)
         
         if self.ref_stats is None:
             self.ref_stats = hsv_stats
