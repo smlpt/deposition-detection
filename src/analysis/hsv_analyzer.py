@@ -7,12 +7,18 @@ from camera.processor import ImageProcessor
 
 @dataclass
 class HSVStats:
-    h_m: float = 0.0
+    h_m: float = 0.0 # Raw values
     s_m: float = 0.0
     v_m: float = 0.0
-    h_decay: float = 0.0
+    h_decay: float = 0.0 # Smooth values
     s_decay: float = 0.0
     v_decay: float = 0.0
+    dh: float = 0.0  # First derivatives
+    ds: float = 0.0
+    dv: float = 0.0
+    ddh: float = 0.0  # Second derivatives
+    dds: float = 0.0
+    ddv: float = 0.0
 
 class HSVAnalyzer:
     
@@ -24,6 +30,8 @@ class HSVAnalyzer:
         self.timestamps = []
 
         self.ref_stats = None
+        """Reference values for the first frame"""
+
         self.is_paused = False
         
         self.current_mask = None
@@ -78,15 +86,37 @@ class HSVAnalyzer:
         
         if self.ref_stats is None:
             self.ref_stats = hsv_stats
+
+        # Calculate new decay values
+        h_decay = alpha * (hsv_stats['h_m'] - self.ref_stats['h_m']) + (1 - alpha) * (self.hsv_history[-1].h_decay if self.hsv_history else hsv_stats['h_m'] - self.ref_stats['h_m'])
+        s_decay = alpha * (hsv_stats['s_m'] - self.ref_stats['s_m']) + (1 - alpha) * (self.hsv_history[-1].s_decay if self.hsv_history else hsv_stats['s_m'] - self.ref_stats['s_m'])
+        v_decay = alpha * (hsv_stats['v_m'] - self.ref_stats['v_m']) + (1 - alpha) * (self.hsv_history[-1].v_decay if self.hsv_history else hsv_stats['v_m'] - self.ref_stats['v_m'])
         
+        # Calculate derivatives
+        if self.hsv_history:
+            prev = self.hsv_history[-1]
+            dh = h_decay - prev.h_decay
+            ds = s_decay - prev.s_decay
+            dv = v_decay - prev.v_decay
+            ddh = dh - prev.dh if prev.dh != 0.0 else 0.0
+            dds = ds - prev.ds if prev.ds != 0.0 else 0.0
+            ddv = dv - prev.dv if prev.dv != 0.0 else 0.0
+        else:
+            dh = ds = dv = ddh = dds = ddv = 0.0
+
         relative_stats = HSVStats(
             h_m=hsv_stats['h_m'] - self.ref_stats['h_m'],
             s_m=hsv_stats['s_m'] - self.ref_stats['s_m'],
             v_m=hsv_stats['v_m'] - self.ref_stats['v_m'],
-            # Append the actual value on the first frame, otherwise calculate an exponentially decaying average
-            h_decay=alpha * (hsv_stats['h_m'] - self.ref_stats['h_m']) + (1 - alpha) * (self.hsv_history[-1].h_decay if self.hsv_history else hsv_stats['h_m'] - self.ref_stats['h_m']),
-            s_decay=alpha * (hsv_stats['s_m'] - self.ref_stats['s_m']) + (1 - alpha) * (self.hsv_history[-1].s_decay if self.hsv_history else hsv_stats['s_m'] - self.ref_stats['s_m']),
-            v_decay=alpha * (hsv_stats['v_m'] - self.ref_stats['v_m']) + (1 - alpha) * (self.hsv_history[-1].v_decay if self.hsv_history else hsv_stats['v_m'] - self.ref_stats['v_m'])
+            h_decay=h_decay,
+            s_decay=s_decay,
+            v_decay=v_decay,
+            dh=dh,
+            ds=ds,
+            dv=dv,
+            ddh=ddh,
+            dds=dds,
+            ddv=ddv
         )
         
         self.hsv_history.append(relative_stats)
@@ -115,5 +145,11 @@ class HSVAnalyzer:
             'v_means': [stats.v_m for stats in self.hsv_history],
             'h_decay': [stats.h_decay for stats in self.hsv_history],
             's_decay': [stats.s_decay for stats in self.hsv_history],
-            'v_decay': [stats.v_decay for stats in self.hsv_history]
+            'v_decay': [stats.v_decay for stats in self.hsv_history],
+            'dH': [stats.dh for stats in self.hsv_history],
+            'dS': [stats.ds for stats in self.hsv_history],
+            'dV': [stats.dv for stats in self.hsv_history],
+            'ddH': [stats.ddh for stats in self.hsv_history],
+            'ddS': [stats.dds for stats in self.hsv_history],
+            'ddV': [stats.ddv for stats in self.hsv_history]
         }

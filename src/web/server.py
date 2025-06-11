@@ -76,11 +76,24 @@ class WebServer:
                 case "V (raw)":
                     fig.add_trace(go.Scatter(y=get_recent(history['v_means']), name='Measured V', line=dict(color="#ebb9cd", dash="dash")))
                 case "H (smooth)":
-                    fig.add_trace(go.Scatter(y=get_recent(history['h_decay']), name='Raw H', line=dict(color="#7aaa28")))
+                    fig.add_trace(go.Scatter(y=get_recent(history['h_decay']), name='Smooth H', line=dict(color="#95d02f")))
                 case "S (smooth)":
-                    fig.add_trace(go.Scatter(y=get_recent(history['s_decay']), name='Raw S', line=dict(color="#398dbe")))
+                    fig.add_trace(go.Scatter(y=get_recent(history['s_decay']), name='Smooth S', line=dict(color="#43a7e1")))
                 case "V (smooth)":
-                    fig.add_trace(go.Scatter(y=get_recent(history['v_decay']), name='Raw V', line=dict(color="#be398d")))
+                    fig.add_trace(go.Scatter(y=get_recent(history['v_decay']), name='Smooth V', line=dict(color="#e443a9")))
+                case "dH":
+                    fig.add_trace(go.Scatter(y=get_recent(history['dH']), name='dH', line=dict(color="#729a27")))
+                case "dS":
+                    fig.add_trace(go.Scatter(y=get_recent(history['dS']), name='dS', line=dict(color="#2f6e9d")))
+                case "dV":
+                    fig.add_trace(go.Scatter(y=get_recent(history['dV']), name='dV', line=dict(color="#9c2f6c")))
+                case "ddH":
+                    fig.add_trace(go.Scatter(y=get_recent(history['ddH']), name='ddH', line=dict(color="#445e17")))
+                case "ddS":
+                    fig.add_trace(go.Scatter(y=get_recent(history['ddS']), name='ddS', line=dict(color="#1a3f66")))
+                case "ddV":
+                    fig.add_trace(go.Scatter(y=get_recent(history['ddV']), name='ddV', line=dict(color="#661a3f")))
+
 
         fig.update_layout(
             title=f"Relative HSV Changes (Last {self.history_window} seconds)",
@@ -95,6 +108,9 @@ class WebServer:
         with self.lock:
             history = self.analyzer.get_history()
             
+        if history.size == 0:
+            gr.Warning("No data to export", 4)
+            return
         samples_per_second = 10
         window_size = int(self.history_window * samples_per_second)
         
@@ -109,7 +125,13 @@ class WebServer:
         h_decay = get_recent(history['h_decay'])
         s_decay = get_recent(history['s_decay'])
         v_decay = get_recent(history['v_decay'])
-    
+        d_h = get_recent(history['dH'])
+        d_s = get_recent(history['dS'])
+        d_v = get_recent(history['dV'])
+        dd_h = get_recent(history['ddH'])
+        dd_s = get_recent(history['ddS'])
+        dd_v = get_recent(history['ddV'])
+
         try:
             import tkinter as tk
             from tkinter import filedialog
@@ -133,13 +155,17 @@ class WebServer:
                     # Write header
                     writer.writerow(['Timestamp', 
                                 'H_Measured', 'S_Measured', 'V_Measured',
-                                'H_Averaged', 'S_Averaged', 'V_Averaged'])
+                                'H_Averaged', 'S_Averaged', 'V_Averaged',
+                                "dH", "dS", "dV",
+                                "ddH", "ddS", "ddV"])
                     
                     # Write data rows
                     for i in range(len(h_means)):
                         writer.writerow([timestamps[i],
                                     h_means[i], s_means[i], v_means[i],
-                                    h_decay[i], s_decay[i], v_decay[i]])  
+                                    h_decay[i], s_decay[i], v_decay[i],
+                                    d_h[i], d_s[i], d_v[i],
+                                    dd_h[i], dd_s[i], dd_v[i]])  
                         
                 gr.Info(f"Exported CSV to {file_path}", 4)
                 
