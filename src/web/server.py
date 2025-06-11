@@ -23,6 +23,7 @@ class WebServer:
         self.logger = logging.getLogger(__name__)
         self.cameras = None
         self.camera_names = None
+        self.selected_channels = ["H (smooth)", "S (smooth)", "V (smooth)"]  # Default color channels for dropdown
         
     def toggle_pause(self):
         return self.analyzer.toggle_pause()
@@ -66,12 +67,20 @@ class WebServer:
             return data[-window_size:] if len(data) > window_size else data
         
         fig = go.Figure()
-        fig.add_trace(go.Scatter(y=get_recent(history['h_means']), name='Measured H', line=dict(color="#c8d6ae", dash="dash")))
-        fig.add_trace(go.Scatter(y=get_recent(history['s_means']), name='Measured S', line=dict(color="#b9cdeb", dash="dash")))
-        fig.add_trace(go.Scatter(y=get_recent(history['v_means']), name='Measured V', line=dict(color="#ebb9cd", dash="dash")))
-        fig.add_trace(go.Scatter(y=get_recent(history['h_decay']), name="Averaged H", line=dict(color="#7aaa28")))
-        fig.add_trace(go.Scatter(y=get_recent(history['s_decay']), name="Averaged S", line=dict(color="#398dbe")))
-        fig.add_trace(go.Scatter(y=get_recent(history['v_decay']), name="Averaged V", line=dict(color="#be398d")))
+        for choice in self.selected_channels:
+            match choice:
+                case "H (raw)":
+                    fig.add_trace(go.Scatter(y=get_recent(history['h_means']), name='Measured H', line=dict(color="#c8d6ae", dash="dash")))
+                case "S (raw)":
+                    fig.add_trace(go.Scatter(y=get_recent(history['s_means']), name='Measured S', line=dict(color="#b9cdeb", dash="dash")))
+                case "V (raw)":
+                    fig.add_trace(go.Scatter(y=get_recent(history['v_means']), name='Measured V', line=dict(color="#ebb9cd", dash="dash")))
+                case "H (smooth)":
+                    fig.add_trace(go.Scatter(y=get_recent(history['h_decay']), name='Raw H', line=dict(color="#7aaa28")))
+                case "S (smooth)":
+                    fig.add_trace(go.Scatter(y=get_recent(history['s_decay']), name='Raw S', line=dict(color="#398dbe")))
+                case "V (smooth)":
+                    fig.add_trace(go.Scatter(y=get_recent(history['v_decay']), name='Raw V', line=dict(color="#be398d")))
 
         fig.update_layout(
             title=f"Relative HSV Changes (Last {self.history_window} seconds)",
@@ -202,6 +211,19 @@ class WebServer:
                     minimum=2800,
                     maximum=7500,
                     step=100
+                )
+
+                dropdown = gr.Dropdown(
+                    ["H (raw)", "S (raw)", "V (raw)", "H (smooth)", "S (smooth)", "V (smooth)",
+                     "dH", "dS", "dV", "ddH", "ddS", "ddV"],
+                    label="Channels", scale=1, show_label=True, multiselect=True, value=self.selected_channels)
+                
+                def update_selected_channels(selected):
+                    self.selected_channels = selected
+
+                dropdown.change(
+                    fn=update_selected_channels,
+                    inputs=[dropdown]
                 )
 
             def update_camera_settings(manual, exp, wb):
