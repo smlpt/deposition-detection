@@ -179,7 +179,7 @@ class WebServer:
             if self.analyzer.current_ellipse is not None:
                 # Draw the ellipse on the frame
                 cv2.ellipse(frame, self.analyzer.current_ellipse, (0, 255, 0), 2)
-
+                cv2.ellipse(frame, self.analyzer.inner_ellipse, (50, 255, 50), 1)
                 # Add the score to the frame
                 try:
                     text = f"Ellipse Score: {self.analyzer.ellipse_score:.2f}"
@@ -218,7 +218,7 @@ class WebServer:
                 toggle_ellipse = gr.Checkbox(True, label="Enable ellipsoid masking")
                 toggle_ellipse.change(fn=self.set_ellipse_fitting, inputs=[toggle_ellipse])
                 
-                history_size = gr.Number(60, label="History in seconds", precision=0, minimum=1, maximum=1200)
+                history_size = gr.Number(60, label="History in seconds", precision=0, minimum=0, maximum=1800)
                 history_size.change(fn=self.update_history_window, inputs=[history_size])
                 
                 manual_exposure = gr.Checkbox(False, label="Manual Exposure")

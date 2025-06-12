@@ -36,6 +36,7 @@ class HSVAnalyzer:
         
         self.current_mask = None
         self.current_ellipse = None
+        self.inner_ellipse = None
         self.ellipse_score = None
         self.is_ellipse_enabled = True
         self.is_mask_frozen = False
@@ -52,7 +53,7 @@ class HSVAnalyzer:
         if self.is_ellipse_enabled:
             # Find ellipse and create mask only if  we didn't freeze the existing one
             if not self.is_mask_frozen:
-                self.current_mask, self.current_ellipse, self.ellipse_score = self.processor.mask_ellipse_contour(frame)
+                self.current_mask, self.current_ellipse, self.inner_ellipse, self.ellipse_score = self.processor.mask_ellipse_contour(frame)
         else:
             self.current_mask = None
             self.current_ellipse = None
@@ -79,7 +80,7 @@ class HSVAnalyzer:
         
         if self.is_ellipse_enabled and not self.is_mask_frozen:
             # Update mask
-            self.current_mask, self.current_ellipse, self.ellipse_score = self.processor.mask_ellipse_contour(frame)
+            self.current_mask, self.current_ellipse, self.inner_ellipse, self.ellipse_score = self.processor.mask_ellipse_contour(frame)
         
         # Calculate stats using the mask
         hsv_stats = self.processor.get_hsv_stats(hsv_frame, self.current_mask)
