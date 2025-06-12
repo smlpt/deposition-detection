@@ -7,7 +7,7 @@ class ImageProcessor:
     def __init__(self):
         self.prev_ellipse = None
         self.prev_mask = None
-        self.alpha = 0.7 # Smoothing factor for the ellipse mask
+        self.alpha = 0.4 # Smoothing factor for the ellipse mask
     
     @staticmethod
     def to_hsv(frame):
@@ -149,17 +149,21 @@ class ImageProcessor:
         
         if best_ellipse is None:
             if self.prev_ellipse is not None:
-                return self.prev_mask, self.prev_ellipse, 0
-            return None, None, None
+                return self.prev_mask, self.prev_ellipse, self.prev_ellipse, 0
+            return None, None, None, None
             
 
         # Blend the current ellipse with the previous one
         smoothed_ellipse = self.blend_ellipses(best_ellipse, self.prev_ellipse)
+        # Creates a smaller ellipse to make masking more robust
+        inner_ellipse = (smoothed_ellipse[0], 
+                            (0.9 * smoothed_ellipse[1][0], 0.9 * smoothed_ellipse[1][1]), 
+                            smoothed_ellipse[2])
         # Create the mask
         mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-        cv2.ellipse(mask, best_ellipse, 255, -1)
+        cv2.ellipse(mask, inner_ellipse, 255, -1)
 
         self.prev_ellipse = smoothed_ellipse
         self.prev_mask = mask.copy()
-        
-        return mask, smoothed_ellipse, best_score
+
+        return mask, smoothed_ellipse, inner_ellipse, best_score
