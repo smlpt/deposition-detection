@@ -7,7 +7,7 @@ class ImageProcessor:
     def __init__(self):
         self.prev_ellipse = None
         self.prev_mask = None
-        self.alpha = 0.4 # Smoothing factor for the ellipse mask
+        self.alpha = 0.6 # Smoothing factor for the ellipse mask
     
     @staticmethod
     def to_hsv(frame):
