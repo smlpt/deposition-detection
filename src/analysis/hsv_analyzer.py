@@ -1,7 +1,8 @@
 from collections import deque
 from dataclasses import dataclass, field
-import datetime
+import datetime, time
 import logging
+from .profile_manager import ThresholdProfile
 
 from camera.processor import ImageProcessor
 
@@ -42,6 +43,52 @@ class HSVAnalyzer:
         self.is_mask_frozen = False
 
         self.processor = processor
+
+        self.current_profile: ThresholdProfile = None
+        self.is_threshold_exceeded = False
+
+        self.last_threshold_check = time.time()
+
+    
+        
+    def set_profile(self, profile: ThresholdProfile):
+        """Set active threshold profile"""
+        self.current_profile = profile
+        self.logger.info(f"Set threshold profile: {profile.name}")
+
+    def check_thresholds(self, stats: HSVStats) -> bool:
+        """Check if current values exceed all thresholds in active profile"""
+        if not self.current_profile:
+            return False
+            
+        threshold_checks = [
+            (self.current_profile.h_decay, stats.h_decay),
+            (self.current_profile.s_decay, stats.s_decay),
+            (self.current_profile.v_decay, stats.v_decay),
+            (self.current_profile.dh, stats.dh),
+            (self.current_profile.ds, stats.ds),
+            (self.current_profile.dv, stats.dv),
+            (self.current_profile.ddh, stats.ddh),
+            (self.current_profile.dds, stats.dds),
+            (self.current_profile.ddv, stats.ddv)
+        ]
+    
+        # Only check thresholds that are not None
+        active_conditions = []
+        for threshold, value in threshold_checks:
+            if threshold is not None:
+                if threshold >= 0:
+                    # Positive threshold: trigger when value >= threshold
+                    active_conditions.append(value >= threshold)
+                else:
+                    # Negative threshold: trigger when value <= threshold
+                    active_conditions.append(value <= threshold)
+        
+        # If no thresholds are set, return False
+        if not active_conditions:
+            return False
+        
+        return all(active_conditions)
         
     def set_reference(self, frame):
         """Set new reference values from a frame and clear history"""
@@ -119,13 +166,16 @@ class HSVAnalyzer:
             dds=dds,
             ddv=ddv
         )
+
+        # Check whether thresholds are exceeded
+        self.is_threshold_exceeded = self.check_thresholds(relative_stats)
         
         self.hsv_history.append(relative_stats)
         self.timestamps.append(datetime.datetime.now().strftime('%H:%M:%S.%f'))
     
     def toggle_pause(self):
         self.is_paused = not self.is_paused
-        return "Resume Analysis" if self.is_paused else "Pause Analysis"
+        return "Resume" if self.is_paused else "Pause"
     
     def freeze_mask(self):
         self.is_mask_frozen = not self.is_mask_frozen
@@ -154,3 +204,18 @@ class HSVAnalyzer:
             'ddS': [stats.dds for stats in self.hsv_history],
             'ddV': [stats.ddv for stats in self.hsv_history]
         }
+    
+    def log_timestamp(self):
+        """Log the current timestamp"""
+        current_time = datetime.datetime.now().strftime('%H:%M:%S.%f')
+        self.logger.info(f"time: {current_time}, "
+                         f", H (smooth): {self.hsv_history[-1].h_decay if self.hsv_history else 0.0}, "
+                         f"S (smooth): {self.hsv_history[-1].s_decay if self.hsv_history else 0.0}, "
+                         f"V (smooth): {self.hsv_history[-1].v_decay if self.hsv_history else 0.0}, "
+                         f"dH: {self.hsv_history[-1].dh if self.hsv_history else 0.0}, "
+                         f"dS: {self.hsv_history[-1].ds if self.hsv_history else 0.0}, "
+                         f"dV: {self.hsv_history[-1].dv if self.hsv_history else 0.0}, "
+                         f"ddH: {self.hsv_history[-1].ddh if self.hsv_history else 0.0}, "
+                         f"ddS: {self.hsv_history[-1].dds if self.hsv_history else 0.0}, "
+                         f"ddV: {self.hsv_history[-1].ddv if self.hsv_history else 0.0}")
+        return current_time
