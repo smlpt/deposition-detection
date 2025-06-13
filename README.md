@@ -47,7 +47,7 @@ On Linux, make the shell script executable by running `chmod +x run_project.sh` 
 - Adds a log button that outputs the values of the current timestamp for all existing timeseries
 
 ### v0.2 Stable Masking and Derivatives
-- Masks are not temporarily stable by adding the distance to the previous detection to the score function
+- Masks are now temporarily stable by adding the distance to the previous detection to the score function
 - Masks transition smoothly between frames
 - Calculate first and second derivatives of each H/S/V channel
 - Dropdown to select which channels to plot
