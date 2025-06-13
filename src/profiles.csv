@@ -1,0 +1,3 @@
+name,h_decay,s_decay,v_decay,dh,ds,dv,ddh,dds,ddv
+Graphene, 10, 15, 5, , , , , ,
+MoS2, 20, 50, -30, , , , , ,
