@@ -218,4 +218,3 @@ class HSVAnalyzer:
                          f"ddH: {self.hsv_history[-1].ddh if self.hsv_history else 0.0}, "
                          f"ddS: {self.hsv_history[-1].dds if self.hsv_history else 0.0}, "
                          f"ddV: {self.hsv_history[-1].ddv if self.hsv_history else 0.0}")
-        return current_time
