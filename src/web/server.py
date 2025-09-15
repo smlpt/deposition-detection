@@ -227,6 +227,18 @@ class WebServer:
             return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         else:
             return None
+        
+    def record_video(self):
+        if self.camera.is_recording:
+            self.camera.stop_recording()
+            return "Record"
+        else:
+            file_name = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+            started_successfully = self.camera.start_recording(file_name + ".mp4")
+            return "Stop recording" if started_successfully else "Record"
+
+    def load_video(self):
+        pass
             
     def shutdown(self):
         self.should_stop = True
@@ -250,7 +262,11 @@ class WebServer:
         with gr.Blocks(theme=gr.themes.Soft()) as demo:
             with gr.Row():
                 gr.Plot(self.create_plots, every=0.1, scale=2, show_label=False)
-                frame = gr.Image(self.show_frame, every=0.03, scale=1, show_label=False)
+                with gr.Column():
+                    frame = gr.Image(self.show_frame, every=0.03, scale=1, show_label=False)
+                    with gr.Row():
+                        record_btn = gr.Button("Record")
+                        load_video_btn = gr.Button("Load Video")
             with gr.Row():
                 pause_btn = gr.Button("Pause")
                 ref_btn = gr.Button("New Reference")
@@ -348,6 +364,9 @@ class WebServer:
             )
             freeze_btn.click(self.freeze_mask, outputs=freeze_btn)
             pause_btn.click(self.toggle_pause, outputs=pause_btn)
+            record_btn.click(self.record_video, outputs=record_btn)
+            load_video_btn.click(self.load_video, outputs=load_video_btn)
+
             ref_btn.click(self.set_new_reference)
             export_btn.click(self.export_csv)
             log_btn.click(self.analyzer.log_timestamp)

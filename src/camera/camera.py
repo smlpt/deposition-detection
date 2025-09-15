@@ -23,6 +23,8 @@ class PiCamera:
         self.exposures = [5, 10, 20, 39, 78, 156, 312, 625, 1250, 2047]
         self.wb = 4000
         self.logger = logging.getLogger(__name__)
+        self.is_recording = False
+        self.video_writer = None
     
     def apply_settings(self):
         """Apply stored exposure and white balance to camera"""
@@ -80,6 +82,9 @@ class PiCamera:
             if ret:
                 with self.lock:
                     self.frame = frame
+                # Record frames to file is the flag is set
+                if getattr(self, 'is_recording', False):
+                    self.video_writer.write(frame)
             time.sleep(0.03)  # ~30 FPS
             
     def get_frame(self):
@@ -92,3 +97,25 @@ class PiCamera:
         if self.stream is not None:
             self.stream.release()
             self.stream = None
+
+    def start_recording(self, filename):
+        # Ensure the recordings directory exists
+        recordings_dir = os.path.join(os.getcwd(), "recordings")
+        os.makedirs(recordings_dir, exist_ok=True)
+        filepath = os.path.join(recordings_dir, filename)
+
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        self.video_writer = cv2.VideoWriter(filepath, fourcc, 20.0, (self.frame.shape[1], self.frame.shape[0]), isColor=True)
+        if not self.video_writer.isOpened():
+            logging.error(f"Failed to open VideoWriter for {filepath}")
+            return False
+        self.is_recording = True
+        logging.info(f"Started recording to {filepath}")
+        return True
+
+    def stop_recording(self):
+        if hasattr(self, 'video_writer') and self.video_writer is not None:
+            self.video_writer.release()
+            self.is_recording = False
+            logging.info("Stopped recording.")
+            
