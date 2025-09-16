@@ -23,7 +23,7 @@ from analysis.hsv_analyzer import HSVAnalyzer
 
 class WebServer:
     def __init__(self, camera, analyzer):
-        self.camera = camera
+        self.camera: PiCamera = camera
         self.analyzer: HSVAnalyzer = analyzer
         self.lock = Lock()
         self.update_event = Event()
@@ -66,8 +66,8 @@ class WebServer:
             "ddV": "ddV"
         }
 
-    def toggle_pause(self):
-        return self.analyzer.toggle_pause()
+    def toggle_pause(self, state: bool = None):
+        return self.analyzer.toggle_pause(state)
     
     def freeze_mask(self):
         return self.analyzer.freeze_mask()
@@ -146,6 +146,7 @@ class WebServer:
         return fig
     
     def export_csv(self):
+        """Open a file dialog and export to a user-defined CSV file."""
         with self.lock:
             history = self.analyzer.get_history()
             
@@ -211,6 +212,7 @@ class WebServer:
             gr.Warning("Error exporting CSV", 4)
         
     def show_frame(self):
+        """Get the current frame, draw the ellipses from the analyzer over it and place the ellipse score text over the frame."""
         frame = self.camera.get_frame()
         if frame is not None:
             if self.analyzer.current_ellipse is not None:
@@ -228,7 +230,8 @@ class WebServer:
         else:
             return None
         
-    def record_video(self):
+    def toggle_record_video(self):
+        """Enables or disables the recording of the currently streamed frames. Output files are placed in ./recordings. """
         if self.camera.is_recording:
             self.camera.stop_recording()
             return "Record"
@@ -238,7 +241,46 @@ class WebServer:
             return "Stop recording" if started_successfully else "Record"
 
     def load_video(self):
-        pass
+        """Load a video file from a file dialog and replace the current camera stream with video frames instead."""
+
+        # Return to normal camera streaming if we stream a video and the user clicked the button again
+        if self.camera.is_stream_video:
+            self.camera.reset_video_reader()
+            self.set_new_reference()
+            self.toggle_pause(False)
+            self.logger.info("Returned to camera stream.")
+            return "Load Video"
+        
+        try:
+            # Create root window and hide it
+            root = tk.Tk()
+            root.withdraw()
+            
+            # Open file dialog
+            file_path = filedialog.askopenfilename(
+                defaultextension='.mp4',
+                filetypes=[('Video files', '*.mp4 *.avi *.mkv *.mov')],
+                title='Load video file for analysis'
+            )
+
+            root.destroy()
+            
+            if file_path:
+                self.logger.info(f"got file path {file_path}")
+                self.camera.video_reader = cv2.VideoCapture(file_path)
+                if self.camera.video_reader.isOpened():
+                    self.camera.is_stream_video = True
+                    self.camera.pause_callback = self.analyzer.toggle_pause
+                    self.camera.video_frame_count = self.camera.video_reader.get(cv2.CAP_PROP_FRAME_COUNT)
+                    self.set_new_reference()
+                    gr.Info(f"Loaded video from {file_path}", 3)
+                    return "Resume Camera"
+                else:
+                    gr.Warning("Failed to load video file", 3)
+                
+        except Exception as e:
+            self.logger.error(f"Error loading video file: {str(e)}")
+            gr.Warning("Error loading video file!", 3)
             
     def shutdown(self):
         self.should_stop = True
@@ -246,6 +288,7 @@ class WebServer:
         os._exit(0)
             
     def launch(self):
+        """Launch the main webserver, construct the UI and connect methods to the buttons."""
         self.logger.info("Launching webserver...")
         self.set_new_reference()
 
@@ -364,7 +407,7 @@ class WebServer:
             )
             freeze_btn.click(self.freeze_mask, outputs=freeze_btn)
             pause_btn.click(self.toggle_pause, outputs=pause_btn)
-            record_btn.click(self.record_video, outputs=record_btn)
+            record_btn.click(self.toggle_record_video, outputs=record_btn)
             load_video_btn.click(self.load_video, outputs=load_video_btn)
 
             ref_btn.click(self.set_new_reference)
