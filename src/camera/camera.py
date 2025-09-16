@@ -25,6 +25,11 @@ class PiCamera:
         self.logger = logging.getLogger(__name__)
         self.is_recording = False
         self.video_writer = None
+        self.is_stream_video = False
+        self.video_reader: cv2.VideoCapture = None
+        self.video_frame_count = -1
+        self.current_frame_idx = 0
+        self.pause_callback = None
     
     def apply_settings(self):
         """Apply stored exposure and white balance to camera"""
@@ -78,10 +83,15 @@ class PiCamera:
     
     def _capture_loop(self):
         while not self._stopped:
-            ret, frame = self.stream.read()
+            # Take the frame either from camera or from a video file
+            ret, frame = self.video_reader.read() if self.is_stream_video else self.stream.read()
             if ret:
                 with self.lock:
                     self.frame = frame
+                    if self.is_stream_video:
+                        self.current_frame_idx += 1
+                    if self.video_frame_count == self.current_frame_idx and self.pause_callback is not None:
+                        self.pause_callback()
                 # Record frames to file is the flag is set
                 if getattr(self, 'is_recording', False):
                     self.video_writer.write(frame)
@@ -107,15 +117,20 @@ class PiCamera:
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         self.video_writer = cv2.VideoWriter(filepath, fourcc, 20.0, (self.frame.shape[1], self.frame.shape[0]), isColor=True)
         if not self.video_writer.isOpened():
-            logging.error(f"Failed to open VideoWriter for {filepath}")
+            self.logger.error(f"Failed to open VideoWriter for {filepath}")
             return False
         self.is_recording = True
-        logging.info(f"Started recording to {filepath}")
+        self.logger.info(f"Started recording to {filepath}")
         return True
 
     def stop_recording(self):
         if hasattr(self, 'video_writer') and self.video_writer is not None:
             self.video_writer.release()
             self.is_recording = False
-            logging.info("Stopped recording.")
+            self.logger.info("Stopped recording.")
             
+    def reset_video_reader(self):
+        self.is_stream_video = False
+        self.video_reader.release()
+        self.video_reader = None
+        self.current_frame_idx = 0

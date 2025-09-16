@@ -173,8 +173,14 @@ class HSVAnalyzer:
         self.hsv_history.append(relative_stats)
         self.timestamps.append(datetime.datetime.now().strftime('%H:%M:%S.%f'))
     
-    def toggle_pause(self):
-        self.is_paused = not self.is_paused
+    def toggle_pause(self, state: bool = None):
+        """Toggles between paused and resumed states.
+        Args:
+            state (bool): Optional parameter that can be used to overwrite the toggle with a fixed state."""
+        if state is not None:
+            self.is_paused = state
+        else:
+            self.is_paused = not self.is_paused
         return "Resume" if self.is_paused else "Pause"
     
     def freeze_mask(self):
