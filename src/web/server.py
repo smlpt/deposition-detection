@@ -348,6 +348,22 @@ class WebServer:
                 )
 
             with gr.Row():
+                ellipse_smoothing_alpha = gr.Number(
+                    value=0.6,
+                    label="Ellipse smoothing alpha",
+                    minimum=0,
+                    maximum=1,
+                    step=0.1
+                )
+                ellipse_margin = gr.Number(
+                    value=0.1,
+                    label="Ellipse Mask Margin",
+                    minimum=0,
+                    maximum=0.9,
+                    step=0.1
+                )
+
+            with gr.Row():
 
                 channel_dropdown = gr.Dropdown(
                     ["H (raw)", "S (raw)", "V (raw)", "H (smooth)", "S (smooth)", "V (smooth)",
@@ -398,6 +414,16 @@ class WebServer:
             wb_val.change(
                 fn=update_camera_settings, 
                 inputs=[manual_exposure, exposure_val, wb_val]
+            )
+
+
+            ellipse_smoothing_alpha.change(
+                fn = lambda x: self.analyzer.processor.__setattr__('alpha', x),
+                inputs=[ellipse_smoothing_alpha]
+            )
+            ellipse_margin.change(
+                fn = lambda x: self.analyzer.processor.__setattr__('ellipse_margin', x),
+                inputs=[ellipse_margin]
             )
                 
             camera_select.change(

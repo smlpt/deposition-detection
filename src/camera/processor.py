@@ -8,6 +8,7 @@ class ImageProcessor:
         self.prev_ellipse = None
         self.prev_mask = None
         self.alpha = 0.6 # Smoothing factor for the ellipse mask
+        self.ellipse_margin = 0.1
     
     @staticmethod
     def to_hsv(frame):
@@ -157,7 +158,8 @@ class ImageProcessor:
         smoothed_ellipse = self.blend_ellipses(best_ellipse, self.prev_ellipse)
         # Creates a smaller ellipse to make masking more robust
         inner_ellipse = (smoothed_ellipse[0], 
-                            (0.9 * smoothed_ellipse[1][0], 0.9 * smoothed_ellipse[1][1]), 
+                            ((1 - self.ellipse_margin) * smoothed_ellipse[1][0],
+                             (1 - self.ellipse_margin) * smoothed_ellipse[1][1]), 
                             smoothed_ellipse[2])
         # Create the mask
         mask = np.zeros(frame.shape[:2], dtype=np.uint8)
