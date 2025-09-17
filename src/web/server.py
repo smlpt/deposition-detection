@@ -361,6 +361,18 @@ class WebServer:
                     maximum=0.9,
                     step=0.1
                 )
+                decay_smoothing = gr.Number(
+                    value=0.05,
+                    label="Decay smoothing",
+                    info="1 - no smoothing, 0 - inf. smoothing",
+                    minimum=0,
+                    maximum=1,
+                    step=0.01
+                )
+                decay_smoothing.change(
+                    fn=lambda x: self.analyzer.__setattr__('decay_alpha', x),
+                    inputs=[max(decay_smoothing, 0.0001)]
+                )
                 derivative_smoothing = gr.Checkbox(
                     value=True,
                     label="Enable Derivative Smoothing"
