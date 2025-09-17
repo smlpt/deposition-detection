@@ -371,7 +371,7 @@ class WebServer:
                 )
                 decay_smoothing.change(
                     fn=lambda x: self.analyzer.__setattr__('decay_alpha', x),
-                    inputs=[max(decay_smoothing, 0.0001)]
+                    inputs=[decay_smoothing]
                 )
                 derivative_smoothing = gr.Checkbox(
                     value=True,
