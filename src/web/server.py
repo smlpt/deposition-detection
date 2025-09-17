@@ -329,28 +329,27 @@ class WebServer:
                 history_size = gr.Number(60, label="History in seconds", precision=0, minimum=0, maximum=1800)
                 history_size.change(fn=self.update_history_window, inputs=[history_size])
                 
-                manual_exposure = gr.Checkbox(False, label="Manual Exposure")
-                exposure_val = gr.Number(
-                    value=0, 
-                    label="Exposure Correction", 
-                    precision=0,
-                    minimum=-4,
-                    maximum=4,
-                    step=1
-                )
-                wb_val = gr.Number(
-                    value=4000,
-                    label="White Balance Temperature (K)",
-                    precision=0,
-                    minimum=2800,
-                    maximum=7500,
-                    step=100
-                )
+                # manual_exposure = gr.Checkbox(False, label="Manual Exposure")
+                # exposure_val = gr.Number(
+                #     value=0, 
+                #     label="Exposure Correction", 
+                #     precision=0,
+                #     minimum=-4,
+                #     maximum=4,
+                #     step=1
+                # )
+                # wb_val = gr.Number(
+                #     value=4000,
+                #     label="White Balance Temperature (K)",
+                #     precision=0,
+                #     minimum=2800,
+                #     maximum=7500,
+                #     step=100
+                # )
 
-            with gr.Row():
                 ellipse_smoothing_alpha = gr.Number(
                     value=0.6,
-                    label="Ellipse smoothing alpha",
+                    label="Ellipse Smoothing",
                     minimum=0,
                     maximum=1,
                     step=0.1
@@ -362,6 +361,28 @@ class WebServer:
                     maximum=0.9,
                     step=0.1
                 )
+                derivative_smoothing = gr.Checkbox(
+                    value=True,
+                    label="Enable Derivative Smoothing"
+                )
+                derivative_smoothing_window = gr.Number(
+                    value=1,
+                    label="Smoothing Window",
+                    info="(2x for d and 4x for dd)",
+                    minimum=1,
+                    maximum=1000,
+                    precision=0,
+                    step=1
+                )
+                derivative_smoothing.change(
+                    fn=self.analyzer.set_derivative_smoothing,
+                    inputs=[derivative_smoothing, derivative_smoothing_window]
+                )
+                derivative_smoothing_window.change(
+                    fn=self.analyzer.set_derivative_smoothing,
+                    inputs=[derivative_smoothing, derivative_smoothing_window]
+                )
+            
 
             with gr.Row():
 
@@ -395,26 +416,26 @@ class WebServer:
                     inputs=[profile_dropdown]
                 )
 
-            def update_camera_settings(manual, exp, wb):
-                if manual:
-                    self.camera.exposure_index = np.clip(exp + 4, 0, 9)
-                    self.camera.wb = np.clip(wb, 2800, 7500)
-                    self.camera.apply_settings()
-                else:
-                    self.camera.enable_auto_settings()
+            # def update_camera_settings(manual, exp, wb):
+            #     if manual:
+            #         self.camera.exposure_index = np.clip(exp + 4, 0, 9)
+            #         self.camera.wb = np.clip(wb, 2800, 7500)
+            #         self.camera.apply_settings()
+            #     else:
+            #         self.camera.enable_auto_settings()
                 
-            manual_exposure.change(
-                fn=update_camera_settings,
-                inputs=[manual_exposure, exposure_val, wb_val]
-            )
-            exposure_val.change(
-                fn=update_camera_settings,
-                inputs=[manual_exposure, exposure_val, wb_val]
-            )
-            wb_val.change(
-                fn=update_camera_settings, 
-                inputs=[manual_exposure, exposure_val, wb_val]
-            )
+            # manual_exposure.change(
+            #     fn=update_camera_settings,
+            #     inputs=[manual_exposure, exposure_val, wb_val]
+            # )
+            # exposure_val.change(
+            #     fn=update_camera_settings,
+            #     inputs=[manual_exposure, exposure_val, wb_val]
+            # )
+            # wb_val.change(
+            #     fn=update_camera_settings, 
+            #     inputs=[manual_exposure, exposure_val, wb_val]
+            # )
 
 
             ellipse_smoothing_alpha.change(
