@@ -2,6 +2,7 @@ from collections import deque
 from dataclasses import dataclass, field
 import datetime, time
 import logging
+import numpy as np
 from .profile_manager import ThresholdProfile
 
 from camera.processor import ImageProcessor
@@ -48,9 +49,17 @@ class HSVAnalyzer:
         self.is_threshold_exceeded = False
 
         self.last_threshold_check = time.time()
-
-    
         
+        # Derivative smoothing parameters
+        self.derivative_smoothing = False
+        self.smoothing_window_size = 5  # Default window size for smoothing
+        
+    def set_derivative_smoothing(self, enable: bool, window_size: int = 5):
+        """Enable/disable derivative smoothing and set window size"""
+        self.derivative_smoothing = enable
+        self.smoothing_window_size = window_size
+        self.logger.debug(f"Derivative smoothing {'enabled' if enable else 'disabled'} with window size {window_size}")
+
     def set_profile(self, profile: ThresholdProfile):
         """Set active threshold profile"""
         self.current_profile = profile
@@ -194,8 +203,26 @@ class HSVAnalyzer:
             self.current_ellipse = None
             self.current_mask = None
             
+    def _apply_sliding_window_smoothing(self, data, window_size):
+        """Apply sliding window smoothing to data using NumPy"""
+        if len(data) < window_size:
+            return data
+        
+        # Convert to numpy array
+        data_array = np.array(data)
+        
+        # Create uniform filter kernel
+        kernel = np.ones(window_size) / window_size
+        
+        # Apply convolution with padding
+        padded_data = np.pad(data_array, window_size//2, mode='edge')
+        smoothed = np.convolve(padded_data, kernel, mode='valid')
+    
+        return smoothed.tolist()
+    
     def get_history(self):
-        return {
+        """Return history with derivative smoothing pipeline applied in post-processing"""
+        history = {
             'timestamps': list(self.timestamps),
             'h_means': [stats.h_m for stats in self.hsv_history],
             's_means': [stats.s_m for stats in self.hsv_history],
@@ -210,6 +237,71 @@ class HSVAnalyzer:
             'ddS': [stats.dds for stats in self.hsv_history],
             'ddV': [stats.ddv for stats in self.hsv_history]
         }
+        
+        if self.derivative_smoothing and len(self.hsv_history) > 0:
+            # Convert to numpy arrays for efficient processing
+            h_decay_array = np.array(history['h_decay'])
+            s_decay_array = np.array(history['s_decay'])
+            v_decay_array = np.array(history['v_decay'])
+            
+            # Apply smoothing to decay values first
+            smoothed_h_decay = self._apply_sliding_window_smoothing(h_decay_array, self.smoothing_window_size)
+            smoothed_s_decay = self._apply_sliding_window_smoothing(s_decay_array, self.smoothing_window_size)
+            smoothed_v_decay = self._apply_sliding_window_smoothing(v_decay_array, self.smoothing_window_size)
+            
+            # Calculate first derivatives from smoothed decay values
+            # We need to handle the case where we have less than 2 elements
+            if len(smoothed_h_decay) >= 2:
+                dH_smoothed = np.diff(smoothed_h_decay, prepend=smoothed_h_decay[0])
+                dS_smoothed = np.diff(smoothed_s_decay, prepend=smoothed_s_decay[0])
+                dV_smoothed = np.diff(smoothed_v_decay, prepend=smoothed_v_decay[0])
+            else:
+                dH_smoothed = [0.0] * len(smoothed_h_decay)
+                dS_smoothed = [0.0] * len(smoothed_s_decay)
+                dV_smoothed = [0.0] * len(smoothed_v_decay)
+            
+            # Apply smoothing to first derivatives
+            if len(dH_smoothed) > 0:
+                smoothed_dH = self._apply_sliding_window_smoothing(dH_smoothed, self.smoothing_window_size*2)
+                smoothed_dS = self._apply_sliding_window_smoothing(dS_smoothed, self.smoothing_window_size*2)
+                smoothed_dV = self._apply_sliding_window_smoothing(dV_smoothed, self.smoothing_window_size*2)
+            else:
+                smoothed_dH = dH_smoothed
+                smoothed_dS = dS_smoothed
+                smoothed_dV = dV_smoothed
+            
+            # Calculate second derivatives from smoothed first derivatives
+            if len(smoothed_dH) >= 2:
+                ddH_smoothed = np.diff(smoothed_dH, prepend=smoothed_dH[0])
+                ddS_smoothed = np.diff(smoothed_dS, prepend=smoothed_dS[0])
+                ddV_smoothed = np.diff(smoothed_dV, prepend=smoothed_dV[0])
+            else:
+                ddH_smoothed = [0.0] * len(smoothed_dH)
+                ddS_smoothed = [0.0] * len(smoothed_dS)
+                ddV_smoothed = [0.0] * len(smoothed_dV)
+            
+            # Apply smoothing to second derivatives
+            if len(ddH_smoothed) > 0:
+                final_ddH = self._apply_sliding_window_smoothing(ddH_smoothed, self.smoothing_window_size*4)
+                final_ddS = self._apply_sliding_window_smoothing(ddS_smoothed, self.smoothing_window_size*4)
+                final_ddV = self._apply_sliding_window_smoothing(ddV_smoothed, self.smoothing_window_size*4)
+            else:
+                final_ddH = ddH_smoothed
+                final_ddS = ddS_smoothed
+                final_ddV = ddV_smoothed
+            
+            # Update the history with smoothed values
+            history['h_decay'] = smoothed_h_decay
+            history['s_decay'] = smoothed_s_decay
+            history['v_decay'] = smoothed_v_decay
+            history['dH'] = smoothed_dH
+            history['dS'] = smoothed_dS
+            history['dV'] = smoothed_dV
+            history['ddH'] = final_ddH
+            history['ddS'] = final_ddS
+            history['ddV'] = final_ddV
+        
+        return history
     
     def log_timestamp(self):
         """Log the current timestamp"""
