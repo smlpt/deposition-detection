@@ -6,10 +6,20 @@ This project aims to create an easy to use interface for monitoring and controll
 
 The interface consists of a webserver that currently performs the following tasks:
 - capture a real-time webcam or Raspberry Pi camera feed
-- perform edge detection and temporarily stable ellipse fitting to find the region of interest: in our case this is a cylindrical container
-- capture a reference frame and calculate the relative HSV data for each subsequently captured frame (and their first and second derivatives
-- select which of the captured and calculated timeseries to plot in a user defined range
-- load a CSV file with sparse threshold profiles. If all threshold conditions are met, alert the user visually
+- perform edge detection and temporally stable ellipse fitting to find the region of interest: in our case this is a cylindrical container
+- capture a reference frame and calculate the (smoothed) relative HSV data for each subsequently captured frame (and their first and second derivatives)
+
+The user interface exposes the following functionality:
+- select the camera device to use
+- change the amount of temporal smoothing applied to the masking ellipse
+- set a masking margin (range 0-1) to discard color changes at the border of the ellipse
+- select which of the captured and calculated timeseries to plot (individual: raw HSV, smoothed HSV, first and second derivatives)
+- select the history size to plot
+- select threshold profiles from the file `profiles.csv`. Threshold conditions in the CSV file can be sparsely populated. If all threshold conditions are met, alert the user visually with a popup. This uses the smoothed values for threshold checking, not the raw values that could fluctuate a lot
+- set an alpha value for decay smoothing. This is a destructive operation and only changes for data points collected after the value was updated
+- set a sliding window smoothing range that is applied to the already smoothed data. First derivatives use this factor x2, second derivatives use x4
+- record the currently streamed frames into a video that will be saved to `./recordings`
+- load a previously recorded video that will replace the current camera stream. After the video finishes, the analysis is paused, and the user can switch back to the camera stream.
 
 > [!Important]
 > Manual exposure and white balance values were only tested on a Raspberry Pi Ubuntu system with a Logitech C920. Other devices are currently not supported for manual exposure control.
@@ -39,6 +49,14 @@ On Linux, make the shell script executable by running `chmod +x run_project.sh` 
 
 ## Changelog
 
+### v0.4 Recording, Loading, Smoothing
+- Allow the user to record videos
+- Load existing videos and stream them instead of the camera feed
+- Expose more parameters to the UI (decay smoothing, sliding window smoothing, temporal ellipse smoothing factor, ellipse margin)
+- Apply sliding window smoothing to the recorded values and to the first and second derivatives
+- Timestamp logging and threshold checking now use the smoothed values
+- Hid the manual exposure controls for now, as they were only available in Linux and for Logitch C920 webcams
+
 ### v0.3 Thresholds
 - Adds a profile.csv file to load sparse threshold data for different materials (filled with dummy data right now)
 - Plot thresholds with the corresponding timeseries
@@ -58,3 +76,14 @@ On Linux, make the shell script executable by running `chmod +x run_project.sh` 
 - HSV plotting for relative changes
 - Export to CSV
 - Manual exposure/WB settings
+
+
+## FAQ
+
+### I don't see any file open/save dialogs!
+Makre sure your browser allows pop-ups.
+
+### Where are my recorded videos?
+Check in the `./recordings` folder.
+
+
