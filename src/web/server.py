@@ -23,7 +23,7 @@ from analysis.hsv_analyzer import HSVAnalyzer
 
 class WebServer:
     def __init__(self, camera, analyzer):
-        self.camera = camera
+        self.camera: PiCamera = camera
         self.analyzer: HSVAnalyzer = analyzer
         self.lock = Lock()
         self.update_event = Event()
@@ -66,8 +66,8 @@ class WebServer:
             "ddV": "ddV"
         }
 
-    def toggle_pause(self):
-        return self.analyzer.toggle_pause()
+    def toggle_pause(self, state: bool = None):
+        return self.analyzer.toggle_pause(state)
     
     def freeze_mask(self):
         return self.analyzer.freeze_mask()
@@ -146,6 +146,7 @@ class WebServer:
         return fig
     
     def export_csv(self):
+        """Open a file dialog and export to a user-defined CSV file."""
         with self.lock:
             history = self.analyzer.get_history()
             
@@ -211,6 +212,7 @@ class WebServer:
             gr.Warning("Error exporting CSV", 4)
         
     def show_frame(self):
+        """Get the current frame, draw the ellipses from the analyzer over it and place the ellipse score text over the frame."""
         frame = self.camera.get_frame()
         if frame is not None:
             if self.analyzer.current_ellipse is not None:
@@ -227,6 +229,58 @@ class WebServer:
             return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         else:
             return None
+        
+    def toggle_record_video(self):
+        """Enables or disables the recording of the currently streamed frames. Output files are placed in ./recordings. """
+        if self.camera.is_recording:
+            self.camera.stop_recording()
+            return "Record"
+        else:
+            file_name = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+            started_successfully = self.camera.start_recording(file_name + ".mp4")
+            return "Stop recording" if started_successfully else "Record"
+
+    def load_video(self):
+        """Load a video file from a file dialog and replace the current camera stream with video frames instead."""
+
+        # Return to normal camera streaming if we stream a video and the user clicked the button again
+        if self.camera.is_stream_video:
+            self.camera.reset_video_reader()
+            self.set_new_reference()
+            self.toggle_pause(False)
+            self.logger.info("Returned to camera stream.")
+            return "Load Video"
+        
+        try:
+            # Create root window and hide it
+            root = tk.Tk()
+            root.withdraw()
+            
+            # Open file dialog
+            file_path = filedialog.askopenfilename(
+                defaultextension='.mp4',
+                filetypes=[('Video files', '*.mp4 *.avi *.mkv *.mov')],
+                title='Load video file for analysis'
+            )
+
+            root.destroy()
+            
+            if file_path:
+                self.logger.info(f"got file path {file_path}")
+                self.camera.video_reader = cv2.VideoCapture(file_path)
+                if self.camera.video_reader.isOpened():
+                    self.camera.is_stream_video = True
+                    self.camera.pause_callback = self.analyzer.toggle_pause
+                    self.camera.video_frame_count = self.camera.video_reader.get(cv2.CAP_PROP_FRAME_COUNT)
+                    self.set_new_reference()
+                    gr.Info(f"Loaded video from {file_path}", 3)
+                    return "Resume Camera"
+                else:
+                    gr.Warning("Failed to load video file", 3)
+                
+        except Exception as e:
+            self.logger.error(f"Error loading video file: {str(e)}")
+            gr.Warning("Error loading video file!", 3)
             
     def shutdown(self):
         self.should_stop = True
@@ -234,6 +288,7 @@ class WebServer:
         os._exit(0)
             
     def launch(self):
+        """Launch the main webserver, construct the UI and connect methods to the buttons."""
         self.logger.info("Launching webserver...")
         self.set_new_reference()
 
@@ -250,7 +305,11 @@ class WebServer:
         with gr.Blocks(theme=gr.themes.Soft()) as demo:
             with gr.Row():
                 gr.Plot(self.create_plots, every=0.1, scale=2, show_label=False)
-                frame = gr.Image(self.show_frame, every=0.03, scale=1, show_label=False)
+                with gr.Column():
+                    frame = gr.Image(self.show_frame, every=0.03, scale=1, show_label=False)
+                    with gr.Row():
+                        record_btn = gr.Button("Record")
+                        load_video_btn = gr.Button("Load Video")
             with gr.Row():
                 pause_btn = gr.Button("Pause")
                 ref_btn = gr.Button("New Reference")
@@ -270,23 +329,72 @@ class WebServer:
                 history_size = gr.Number(60, label="History in seconds", precision=0, minimum=0, maximum=1800)
                 history_size.change(fn=self.update_history_window, inputs=[history_size])
                 
-                manual_exposure = gr.Checkbox(False, label="Manual Exposure")
-                exposure_val = gr.Number(
-                    value=0, 
-                    label="Exposure Correction", 
+                # manual_exposure = gr.Checkbox(False, label="Manual Exposure")
+                # exposure_val = gr.Number(
+                #     value=0, 
+                #     label="Exposure Correction", 
+                #     precision=0,
+                #     minimum=-4,
+                #     maximum=4,
+                #     step=1
+                # )
+                # wb_val = gr.Number(
+                #     value=4000,
+                #     label="White Balance Temperature (K)",
+                #     precision=0,
+                #     minimum=2800,
+                #     maximum=7500,
+                #     step=100
+                # )
+
+                ellipse_smoothing_alpha = gr.Number(
+                    value=0.6,
+                    label="Ellipse Smoothing",
+                    minimum=0,
+                    maximum=1,
+                    step=0.1
+                )
+                ellipse_margin = gr.Number(
+                    value=0.1,
+                    label="Ellipse Mask Margin",
+                    minimum=0,
+                    maximum=0.9,
+                    step=0.1
+                )
+                decay_smoothing = gr.Number(
+                    value=0.05,
+                    label="Decay smoothing",
+                    info="1 - no smoothing, 0 - inf. smoothing",
+                    minimum=0,
+                    maximum=1,
+                    step=0.01
+                )
+                decay_smoothing.change(
+                    fn=lambda x: self.analyzer.__setattr__('decay_alpha', x),
+                    inputs=[decay_smoothing]
+                )
+                derivative_smoothing = gr.Checkbox(
+                    value=True,
+                    label="Enable Derivative Smoothing"
+                )
+                derivative_smoothing_window = gr.Number(
+                    value=1,
+                    label="Smoothing Window",
+                    info="(2x for d and 4x for dd)",
+                    minimum=1,
+                    maximum=1000,
                     precision=0,
-                    minimum=-4,
-                    maximum=4,
                     step=1
                 )
-                wb_val = gr.Number(
-                    value=4000,
-                    label="White Balance Temperature (K)",
-                    precision=0,
-                    minimum=2800,
-                    maximum=7500,
-                    step=100
+                derivative_smoothing.change(
+                    fn=self.analyzer.set_derivative_smoothing,
+                    inputs=[derivative_smoothing, derivative_smoothing_window]
                 )
+                derivative_smoothing_window.change(
+                    fn=self.analyzer.set_derivative_smoothing,
+                    inputs=[derivative_smoothing, derivative_smoothing_window]
+                )
+            
 
             with gr.Row():
 
@@ -320,25 +428,35 @@ class WebServer:
                     inputs=[profile_dropdown]
                 )
 
-            def update_camera_settings(manual, exp, wb):
-                if manual:
-                    self.camera.exposure_index = np.clip(exp + 4, 0, 9)
-                    self.camera.wb = np.clip(wb, 2800, 7500)
-                    self.camera.apply_settings()
-                else:
-                    self.camera.enable_auto_settings()
+            # def update_camera_settings(manual, exp, wb):
+            #     if manual:
+            #         self.camera.exposure_index = np.clip(exp + 4, 0, 9)
+            #         self.camera.wb = np.clip(wb, 2800, 7500)
+            #         self.camera.apply_settings()
+            #     else:
+            #         self.camera.enable_auto_settings()
                 
-            manual_exposure.change(
-                fn=update_camera_settings,
-                inputs=[manual_exposure, exposure_val, wb_val]
+            # manual_exposure.change(
+            #     fn=update_camera_settings,
+            #     inputs=[manual_exposure, exposure_val, wb_val]
+            # )
+            # exposure_val.change(
+            #     fn=update_camera_settings,
+            #     inputs=[manual_exposure, exposure_val, wb_val]
+            # )
+            # wb_val.change(
+            #     fn=update_camera_settings, 
+            #     inputs=[manual_exposure, exposure_val, wb_val]
+            # )
+
+
+            ellipse_smoothing_alpha.change(
+                fn = lambda x: self.analyzer.processor.__setattr__('alpha', x),
+                inputs=[ellipse_smoothing_alpha]
             )
-            exposure_val.change(
-                fn=update_camera_settings,
-                inputs=[manual_exposure, exposure_val, wb_val]
-            )
-            wb_val.change(
-                fn=update_camera_settings, 
-                inputs=[manual_exposure, exposure_val, wb_val]
+            ellipse_margin.change(
+                fn = lambda x: self.analyzer.processor.__setattr__('ellipse_margin', x),
+                inputs=[ellipse_margin]
             )
                 
             camera_select.change(
@@ -348,6 +466,9 @@ class WebServer:
             )
             freeze_btn.click(self.freeze_mask, outputs=freeze_btn)
             pause_btn.click(self.toggle_pause, outputs=pause_btn)
+            record_btn.click(self.toggle_record_video, outputs=record_btn)
+            load_video_btn.click(self.load_video, outputs=load_video_btn)
+
             ref_btn.click(self.set_new_reference)
             export_btn.click(self.export_csv)
             log_btn.click(self.analyzer.log_timestamp)

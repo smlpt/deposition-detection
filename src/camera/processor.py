@@ -8,6 +8,7 @@ class ImageProcessor:
         self.prev_ellipse = None
         self.prev_mask = None
         self.alpha = 0.6 # Smoothing factor for the ellipse mask
+        self.ellipse_margin = 0.1
     
     @staticmethod
     def to_hsv(frame):
@@ -92,14 +93,15 @@ class ImageProcessor:
         # Find contours
         contours, hierarchy = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         
-        w = frame.shape[1]
+        width = frame.shape[1]
         best_ellipse = None
         best_score = 0
         
+        # Iterate through all possible ellipses in the frame and find the one with the highest score
         for contour in contours:
             # Skip if contour is too small or too large
             contour_length = cv2.arcLength(contour, False)
-            if contour_length < 0.4 * w or contour_length > 3 * w:
+            if contour_length < 0.4 * width or contour_length > 3 * width:
                 continue
                 
             # Need at least 5 points to fit an ellipse
@@ -133,7 +135,7 @@ class ImageProcessor:
                 # Distance to previous ellipse center
                 prev_dist = np.sqrt((ellipse[0][0] - self.prev_ellipse[0][0])**2 + 
                                   (ellipse[0][1] - self.prev_ellipse[0][1])**2)
-                dist_weight = np.exp(-prev_dist / (0.2 * w))  # Exponential falloff
+                dist_weight = np.exp(-prev_dist / (0.2 * width))  # Exponential falloff
                 
                 # Size similarity
                 size_ratio = (ellipse[1][0] * ellipse[1][1]) / (self.prev_ellipse[1][0] * self.prev_ellipse[1][1])
@@ -157,7 +159,8 @@ class ImageProcessor:
         smoothed_ellipse = self.blend_ellipses(best_ellipse, self.prev_ellipse)
         # Creates a smaller ellipse to make masking more robust
         inner_ellipse = (smoothed_ellipse[0], 
-                            (0.9 * smoothed_ellipse[1][0], 0.9 * smoothed_ellipse[1][1]), 
+                            ((1 - self.ellipse_margin) * smoothed_ellipse[1][0],
+                             (1 - self.ellipse_margin) * smoothed_ellipse[1][1]), 
                             smoothed_ellipse[2])
         # Create the mask
         mask = np.zeros(frame.shape[:2], dtype=np.uint8)
