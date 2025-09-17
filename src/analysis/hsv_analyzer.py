@@ -42,6 +42,7 @@ class HSVAnalyzer:
         self.ellipse_score = None
         self.is_ellipse_enabled = True
         self.is_mask_frozen = False
+        self.decay_alpha = 0.05
 
         self.processor = processor
 
@@ -126,7 +127,7 @@ class HSVAnalyzer:
         
         self.hsv_history.clear()
         
-    def update(self, frame, alpha):
+    def update(self, frame):
         """Update with new frame relative to reference frame"""
         if self.is_paused:
             return
@@ -145,9 +146,9 @@ class HSVAnalyzer:
             self.ref_stats = hsv_stats
 
         # Calculate new decay values
-        h_decay = alpha * (hsv_stats['h_m'] - self.ref_stats['h_m']) + (1 - alpha) * (self.hsv_history[-1].h_decay if self.hsv_history else hsv_stats['h_m'] - self.ref_stats['h_m'])
-        s_decay = alpha * (hsv_stats['s_m'] - self.ref_stats['s_m']) + (1 - alpha) * (self.hsv_history[-1].s_decay if self.hsv_history else hsv_stats['s_m'] - self.ref_stats['s_m'])
-        v_decay = alpha * (hsv_stats['v_m'] - self.ref_stats['v_m']) + (1 - alpha) * (self.hsv_history[-1].v_decay if self.hsv_history else hsv_stats['v_m'] - self.ref_stats['v_m'])
+        h_decay = self.decay_alpha * (hsv_stats['h_m'] - self.ref_stats['h_m']) + (1 - self.decay_alpha) * (self.hsv_history[-1].h_decay if self.hsv_history else hsv_stats['h_m'] - self.ref_stats['h_m'])
+        s_decay = self.decay_alpha * (hsv_stats['s_m'] - self.ref_stats['s_m']) + (1 - self.decay_alpha) * (self.hsv_history[-1].s_decay if self.hsv_history else hsv_stats['s_m'] - self.ref_stats['s_m'])
+        v_decay = self.decay_alpha * (hsv_stats['v_m'] - self.ref_stats['v_m']) + (1 - self.decay_alpha) * (self.hsv_history[-1].v_decay if self.hsv_history else hsv_stats['v_m'] - self.ref_stats['v_m'])
         
         # Calculate derivatives
         if self.hsv_history:
@@ -175,9 +176,6 @@ class HSVAnalyzer:
             dds=dds,
             ddv=ddv
         )
-
-        # Check whether thresholds are exceeded
-        self.is_threshold_exceeded = self.check_thresholds(relative_stats)
         
         self.hsv_history.append(relative_stats)
         self.timestamps.append(datetime.datetime.now().strftime('%H:%M:%S.%f'))
@@ -300,6 +298,9 @@ class HSVAnalyzer:
             history['ddH'] = final_ddH
             history['ddS'] = final_ddS
             history['ddV'] = final_ddV
+
+            # Check whether thresholds are exceeded
+            self.is_threshold_exceeded = self.check_thresholds(history)
         
         return history
     
