@@ -85,5 +85,3 @@ Makre sure your browser allows pop-ups.
 
 ### Where are my recorded videos?
 Check in the `./recordings` folder.
-
-
