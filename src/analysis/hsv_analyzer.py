@@ -44,6 +44,8 @@ class HSVAnalyzer:
         self.is_mask_frozen = False
         self.decay_alpha = 0.05
 
+        self.current_smoothed_stats: HSVStats
+
         self.processor = processor
 
         self.current_profile: ThresholdProfile = None
@@ -299,21 +301,54 @@ class HSVAnalyzer:
             history['ddS'] = final_ddS
             history['ddV'] = final_ddV
 
-            # Check whether thresholds are exceeded
-            self.is_threshold_exceeded = self.check_thresholds(history)
+        # Update current smoothed stats with the last entry
+        if self.hsv_history:
+            # Create HSVStats object from the last smoothed values
+            self.current_smoothed_stats = HSVStats(
+                h_m=history['h_means'][-1] if history['h_means'] else 0.0,
+                s_m=history['s_means'][-1] if history['s_means'] else 0.0,
+                v_m=history['v_means'][-1] if history['v_means'] else 0.0,
+                h_decay=history['h_decay'][-1] if history['h_decay'] else 0.0,
+                s_decay=history['s_decay'][-1] if history['s_decay'] else 0.0,
+                v_decay=history['v_decay'][-1] if history['v_decay'] else 0.0,
+                dh=history['dH'][-1] if history['dH'] else 0.0,
+                ds=history['dS'][-1] if history['dS'] else 0.0,
+                dv=history['dV'][-1] if history['dV'] else 0.0,
+                ddh=history['ddH'][-1] if history['ddH'] else 0.0,
+                dds=history['ddS'][-1] if history['ddS'] else 0.0,
+                ddv=history['ddV'][-1] if history['ddV'] else 0.0
+            )
+            
+            # Check thresholds using the smoothed values
+            self.is_threshold_exceeded = self.check_thresholds(self.current_smoothed_stats)
         
         return history
     
     def log_timestamp(self):
         """Log the current timestamp"""
         current_time = datetime.datetime.now().strftime('%H:%M:%S.%f')
-        self.logger.info(f"time: {current_time}, "
-                         f", H (smooth): {self.hsv_history[-1].h_decay if self.hsv_history else 0.0}, "
-                         f"S (smooth): {self.hsv_history[-1].s_decay if self.hsv_history else 0.0}, "
-                         f"V (smooth): {self.hsv_history[-1].v_decay if self.hsv_history else 0.0}, "
-                         f"dH: {self.hsv_history[-1].dh if self.hsv_history else 0.0}, "
-                         f"dS: {self.hsv_history[-1].ds if self.hsv_history else 0.0}, "
-                         f"dV: {self.hsv_history[-1].dv if self.hsv_history else 0.0}, "
-                         f"ddH: {self.hsv_history[-1].ddh if self.hsv_history else 0.0}, "
-                         f"ddS: {self.hsv_history[-1].dds if self.hsv_history else 0.0}, "
-                         f"ddV: {self.hsv_history[-1].ddv if self.hsv_history else 0.0}")
+        if hasattr(self, 'current_smoothed_stats'):
+            self.logger.info(
+                f"time: {current_time}, "
+                f", H (smooth): {self.current_smoothed_stats.h_decay}, "
+                f"S (smooth): {self.current_smoothed_stats.s_decay}, "
+                f"V (smooth): {self.current_smoothed_stats.v_decay}, "
+                f"dH: {self.current_smoothed_stats.dh}, "
+                f"dS: {self.current_smoothed_stats.ds}, "
+                f"dV: {self.current_smoothed_stats.dv}, "
+                f"ddH: {self.current_smoothed_stats.ddh}, "
+                f"ddS: {self.current_smoothed_stats.dds}, "
+                f"ddV: {self.current_smoothed_stats.ddv}")
+        else:
+            # Fallback to original logging if current_smoothed_stats doesn't exist
+            self.logger.info(
+                f"time: {current_time}, "
+                f", H (smooth): {self.hsv_history[-1].h_decay if self.hsv_history else 0.0}, "
+                f"S (smooth): {self.hsv_history[-1].s_decay if self.hsv_history else 0.0}, "
+                f"V (smooth): {self.hsv_history[-1].v_decay if self.hsv_history else 0.0}, "
+                f"dH: {self.hsv_history[-1].dh if self.hsv_history else 0.0}, "
+                f"dS: {self.hsv_history[-1].ds if self.hsv_history else 0.0}, "
+                f"dV: {self.hsv_history[-1].dv if self.hsv_history else 0.0}, "
+                f"ddH: {self.hsv_history[-1].ddh if self.hsv_history else 0.0}, "
+                f"ddS: {self.hsv_history[-1].dds if self.hsv_history else 0.0}, "
+                f"ddV: {self.hsv_history[-1].ddv if self.hsv_history else 0.0}")
