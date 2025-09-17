@@ -13,7 +13,7 @@ def analysis_loop(camera, processor, analyzer):
     while True:
         frame = camera.get_frame()
         if frame is not None:
-            analyzer.update(frame, alpha=0.05)
+            analyzer.update(frame)
         time.sleep(0.1)  # 10 Hz analysis rate
 
 def main():
