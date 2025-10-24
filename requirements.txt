@@ -7,4 +7,5 @@ scipy
 scikit-image
 jupyter
 ipympl
-pyueye
+ids-peak
+ids_peak_ipl
