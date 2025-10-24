@@ -81,7 +81,7 @@ On Linux, make the shell script executable by running `chmod +x run_project.sh` 
 ## FAQ
 
 ### I don't see any file open/save dialogs!
-Makre sure your browser allows pop-ups.
+Make sure your browser allows pop-ups.
 
 ### Where are my recorded videos?
 Check in the `./recordings` folder.
