@@ -5,6 +5,7 @@ from web.server import WebServer
 import time
 import threading
 import logging
+import sys
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -17,6 +18,8 @@ def analysis_loop(camera, processor, analyzer):
         time.sleep(0.1)  # 10 Hz analysis rate
 
 def main():
+
+    print(f"Using Python location {sys.executable}")
     
     # Initialize components
     camera = PiCamera()
