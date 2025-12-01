@@ -302,7 +302,7 @@ class WebServer:
         else:
             self.logger.warning(" No profiles.csv found.")
         
-        with gr.Blocks(theme=gr.themes.Soft()) as demo:
+        with gr.Blocks() as demo:
             with gr.Row():
                 gr.Plot(self.create_plots, every=0.1, scale=2, show_label=False)
                 with gr.Column():
@@ -480,4 +480,4 @@ class WebServer:
             alert_timer.tick(fn=self.check_alerts)
        
         # self.should_stop = True
-        demo.queue().launch(server_name='0.0.0.0', show_api=False)
+        demo.queue().launch(theme=gr.themes.Soft(), server_name='0.0.0.0', footer_links=[""])
