@@ -16,25 +16,26 @@ from tkinter import filedialog
 import csv
 from datetime import datetime
 
-from camera.camera import PiCamera
+from camera.camera import Camera
 from camera.processor import ImageProcessor
 from analysis.profile_manager import ProfileManager
 from analysis.hsv_analyzer import HSVAnalyzer
 
 class WebServer:
     def __init__(self, camera, analyzer):
-        self.camera: PiCamera = camera
+        self.camera: Camera = camera
         self.analyzer: HSVAnalyzer = analyzer
         self.lock = Lock()
         self.update_event = Event()
         self.should_stop = False
         self.history_window = 60 # default is a minute
         self.logger = logging.getLogger(__name__)
-        self.cameras = None
+        self.cameras: dict = None
         self.camera_names = None
         self.selected_channels = ["H (smooth)", "S (smooth)", "V (smooth)"]  # Default color channels for dropdown
         self.profile_manager = ProfileManager()
         self.time_since_alert = time.time()
+        self.alert_timer: gr.Timer
         
         self.col_map = {
             "h_means": "#c8d6ae",
@@ -85,17 +86,24 @@ class WebServer:
     def set_ellipse_fitting(self, value):
         self.analyzer.set_ellipse_masking(value)
         
-    def switch_camera(self, device_name):
+    def switch_camera(self, device_name: str):
         """Handle camera switch from dropdown"""
-        # Extract device index from the name (e.g., "Camera 0" -> 0)
-        device_index = int(device_name.split()[-1])
-        self.camera.switch_camera(device_index)
+        try:
+            device_index = next(cam["index"] for cam in self.cameras if cam["name"] == device_name)
+            self.camera.switch_camera(device_index)
+            # Only show exposure/gamma/WB row when IDs cam is used
+            is_ids = device_name.startswith("IDS")
+            return None, gr.update(visible=is_ids)  # Return (frame, ids_row visibility)
+
+        except:
+            self.logger.warning(f"Failed to find camera with name {device_name}! Device won't be changed.")
+        
         return None  # Return None to clear the current frame while switching
     
     def find_camera_devices(self):
         # Get list of available cameras
         self.cameras = self.camera.list_cameras()
-        self.camera_names = [f"Camera {cam['index']}" for cam in self.cameras]
+        self.camera_names = [cam["name"] for cam in self.cameras]
 
     def check_alerts(self):
         """Check for threshold alerts and return appropriate UI feedback"""
@@ -244,11 +252,16 @@ class WebServer:
         """Load a video file from a file dialog and replace the current camera stream with video frames instead."""
 
         # Return to normal camera streaming if we stream a video and the user clicked the button again
-        if self.camera.is_stream_video:
+        if self.camera.is_stream_from_file:
             self.camera.reset_video_reader()
-            self.set_new_reference()
-            self.toggle_pause(False)
-            self.logger.info("Returned to camera stream.")
+            # Wait for valid camera frame before setting reference
+            if self.camera.wait_for_frame(timeout=3.0):
+                self.toggle_pause(False)
+                self.set_new_reference()
+                self.logger.info("Returned to camera stream.")
+            else:
+                self.logger.warning("Timeout waiting for camera frame")
+                gr.Warning("Failed to get camera frame", 3)
             return "Load Video"
         
         try:
@@ -266,14 +279,19 @@ class WebServer:
             root.destroy()
             
             if file_path:
-                self.logger.info(f"got file path {file_path}")
+                self.logger.info(f" Got video file path {file_path}")
                 self.camera.video_reader = cv2.VideoCapture(file_path)
                 if self.camera.video_reader.isOpened():
-                    self.camera.is_stream_video = True
+                    self.camera.is_stream_from_file = True
                     self.camera.pause_callback = self.analyzer.toggle_pause
                     self.camera.video_frame_count = self.camera.video_reader.get(cv2.CAP_PROP_FRAME_COUNT)
-                    self.set_new_reference()
-                    gr.Info(f"Loaded video from {file_path}", 3)
+                    # Wait for first video frame before setting reference
+                    if self.camera.wait_for_frame(timeout=3.0):
+                        self.set_new_reference()
+                        gr.Info(f"Loaded video from {file_path}", 3)
+                    else:
+                        self.logger.warning("Timeout waiting for video frame")
+                        gr.Warning("Failed to load video frame", 3)
                     return "Resume Camera"
                 else:
                     gr.Warning("Failed to load video file", 3)
@@ -284,6 +302,7 @@ class WebServer:
             
     def shutdown(self):
         self.should_stop = True
+        gr.close_all(True)
         time.sleep(0.5) # time for threads to clean up
         os._exit(0)
             
@@ -328,24 +347,6 @@ class WebServer:
                 
                 history_size = gr.Number(60, label="History in seconds", precision=0, minimum=0, maximum=1800)
                 history_size.change(fn=self.update_history_window, inputs=[history_size])
-                
-                # manual_exposure = gr.Checkbox(False, label="Manual Exposure")
-                # exposure_val = gr.Number(
-                #     value=0, 
-                #     label="Exposure Correction", 
-                #     precision=0,
-                #     minimum=-4,
-                #     maximum=4,
-                #     step=1
-                # )
-                # wb_val = gr.Number(
-                #     value=4000,
-                #     label="White Balance Temperature (K)",
-                #     precision=0,
-                #     minimum=2800,
-                #     maximum=7500,
-                #     step=100
-                # )
 
                 ellipse_smoothing_alpha = gr.Number(
                     value=0.6,
@@ -428,26 +429,80 @@ class WebServer:
                     inputs=[profile_dropdown]
                 )
 
-            # def update_camera_settings(manual, exp, wb):
-            #     if manual:
-            #         self.camera.exposure_index = np.clip(exp + 4, 0, 9)
-            #         self.camera.wb = np.clip(wb, 2800, 7500)
-            #         self.camera.apply_settings()
-            #     else:
-            #         self.camera.enable_auto_settings()
+            ids_row = gr.Row(visible=False)
+            with ids_row:
+
+                exposure = gr.Number(
+                    value=1,
+                    label="Exposure",
+                    minimum=0.0,
+                    maximum=20.0,
+                    step=0.1,
+                    precision=1,
+                    info="Sqrt of Exp. in ms"
+                )
+
+                # For IDS cameras, load the initial exposure value after a short delay
+                def get_initial_exposure():
+                    """Get initial exposure from camera after it starts"""
+                    time.sleep(0.5)  # Wait for camera to initialize
+                    if hasattr(self.camera, '_exposure'):
+                        return float(self.camera._exposure)
+                    return 1.0
                 
-            # manual_exposure.change(
-            #     fn=update_camera_settings,
-            #     inputs=[manual_exposure, exposure_val, wb_val]
-            # )
-            # exposure_val.change(
-            #     fn=update_camera_settings,
-            #     inputs=[manual_exposure, exposure_val, wb_val]
-            # )
-            # wb_val.change(
-            #     fn=update_camera_settings, 
-            #     inputs=[manual_exposure, exposure_val, wb_val]
-            # )
+                # Use a one-time event to update the exposure display
+                exposure_init = gr.Button(visible=False, elem_id="exposure_init")
+                demo.load(fn=get_initial_exposure, outputs=[exposure])
+
+                exposure.change(
+                    fn = lambda x: self.camera.__setattr__('exposure', x),
+                    inputs=[exposure]
+                )
+
+
+                gamma = gr.Number(
+                    value=1,
+                    label="Gamma",
+                    minimum=0.0,
+                    maximum=5.0,
+                    step=0.1
+                )
+
+                gamma.change(
+                    fn = lambda x: self.camera.build_gamma_LUT(x),
+                    inputs=[gamma]
+                )
+
+                red_gain = gr.Number(
+                    value=1.7,
+                    label="Red/Cyan Gain",
+                    minimum=0.0,
+                    maximum=5.0,
+                    step=0.05,
+                    precision=1
+                )
+
+                red_gain.change(
+                    fn = lambda x: self.camera.__setattr__('red_gain', x),
+                    inputs=[red_gain]
+                )
+
+                blue_gain = gr.Number(
+                    value=1.8,
+                    label="Blue/Yellow Gain",
+                    minimum=0.0,
+                    maximum=5.0,
+                    step=0.05,
+                    precision=1
+                )
+
+                blue_gain.change(
+                    fn = lambda x: self.camera.__setattr__('blue_gain', x),
+                    inputs=[blue_gain]
+                )
+
+                auto_wb = gr.Button("Calibrate WB")
+                auto_wb.click(self.camera.calculate_WB, outputs=[red_gain, blue_gain])
 
 
             ellipse_smoothing_alpha.change(
@@ -462,7 +517,7 @@ class WebServer:
             camera_select.change(
                 fn=self.switch_camera,
                 inputs=[camera_select],
-                outputs=[frame]
+                outputs=[frame, ids_row]
             )
             freeze_btn.click(self.freeze_mask, outputs=freeze_btn)
             pause_btn.click(self.toggle_pause, outputs=pause_btn)
@@ -476,8 +531,9 @@ class WebServer:
 
             # Add hidden timer component for checking alerts
             # This runs within Gradio's context and can show notifications
-            alert_timer = gr.Timer(1)
-            alert_timer.tick(fn=self.check_alerts)
+            self.alert_timer = gr.Timer(1)
+            self.alert_timer.tick(fn=self.check_alerts)
+            
        
         # self.should_stop = True
         demo.queue().launch(theme=gr.themes.Soft(), server_name='0.0.0.0', footer_links=[""])
