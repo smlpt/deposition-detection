@@ -295,6 +295,8 @@ class WebServer:
                     return "Resume Camera"
                 else:
                     gr.Warning("Failed to load video file", 3)
+            else:
+                return "Load Video"
                 
         except Exception as e:
             self.logger.error(f"Error loading video file: {str(e)}")
