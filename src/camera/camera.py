@@ -94,16 +94,21 @@ class Camera:
         self.camera_list = []
 
         # Find IDS camera
-        ids_peak.Library.Initialize()
-        device_manager = ids_peak.DeviceManager.Instance()
-        device_manager.Update()
-        self.ids_devices = device_manager.Devices()
+        try:
+            ids_peak.Library.Initialize()
+            device_manager = ids_peak.DeviceManager.Instance()
+            device_manager.Update()
+            self.ids_devices = device_manager.Devices()
 
-        if len(self.ids_devices) > 0:
-            # Append IDS to camera list and return immediately
-            for index, ids_cam in enumerate(self.ids_devices):
-                self.camera_list.append({"index": index, "name": f"IDS {ids_cam.ModelName()}"})
-            self.use_ids = True
+            if len(self.ids_devices) > 0:
+                # Append IDS to camera list and return immediately
+                for index, ids_cam in enumerate(self.ids_devices):
+                    self.camera_list.append({"index": index, "name": f"IDS {ids_cam.ModelName()}"})
+                self.use_ids = True
+        except:
+            self.use_ids = False
+            self.logger.warning("Failed to initialize IDS camera devices. Maybe incorrect IDS peak & driver installation?" \
+            "Resorting to webcam devices only.")
 
         webcam_count = len(self.ids_devices)
         # Check first 5 indexes
@@ -213,13 +218,9 @@ class Camera:
 
         base_width = 600
 
-        count = 0
-
         while not self._stopped:
-
-            start = timer()
-
-            if self.use_ids and not self.is_stream_from_file:
+        
+            if self.use_ids and isinstance(self.stream, ids_peak.DataStream) and not self.is_stream_from_file:
                 
                 buffer = self.stream.WaitForFinishedBuffer(1000)
                 raw_image = ids_ipl_extension.BufferToImage(buffer)
@@ -263,7 +264,17 @@ class Camera:
 
             else:
                 # Take the frame either from camera or from a video file
-                ret, frame = self.video_reader.read() if self.is_stream_from_file else self.stream.read()
+                if self.is_stream_from_file:
+                    ret, frame = self.video_reader.read()
+                else:
+                    # Check if stream is valid before reading
+                    if self.stream is not None and isinstance(self.stream, cv2.VideoCapture):
+                        ret, frame = self.stream.read()
+                    else:
+                        # Stream is not valid, skip this iteration
+                        ret = False
+                        frame = None
+                        
                 if ret:
                     with self.lock:
                         self.frame = frame
@@ -276,12 +287,9 @@ class Camera:
                     if getattr(self, 'is_recording', False):
                         self.video_writer.write(frame)
                 else:
-                    print("failed to load frame")
-
-            if count % 10 == 0:
-                self.logger.info(timer() - start)
-
-            count += 1
+                    # Only print warning if we're not in file streaming mode
+                    if not self.is_stream_from_file:
+                        print("failed to load frame")
 
             time.sleep(0.03)  # ~30 FPS
             
@@ -338,4 +346,3 @@ class Camera:
             self.video_reader.release()
             self.video_reader = None
         self.current_frame_idx = 0
-        
