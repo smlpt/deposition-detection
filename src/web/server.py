@@ -91,7 +91,7 @@ class WebServer:
         try:
             device_index = next(cam["index"] for cam in self.cameras if cam["name"] == device_name)
             self.camera.switch_camera(device_index)
-            # Only show exposure/gamma/WB row when IDs cam is used
+            # Only show exposure/gamma/WB row when IDS cam is used
             is_ids = device_name.startswith("IDS")
             return None, gr.update(visible=is_ids)  # Return (frame, ids_row visibility)
 
@@ -309,6 +309,10 @@ class WebServer:
     def launch(self):
         """Launch the main webserver, construct the UI and connect methods to the buttons."""
         self.logger.info("Launching webserver...")
+
+        initial_camera = self.camera_names[0] if self.camera_names else ""
+        initial_is_ids = initial_camera.startswith("IDS")
+
         self.set_new_reference()
 
         # Load threshold profiles from file and activate the first one
@@ -429,7 +433,7 @@ class WebServer:
                     inputs=[profile_dropdown]
                 )
 
-            ids_row = gr.Row(visible=False)
+            ids_row = gr.Row(visible=initial_is_ids)
             with ids_row:
 
                 exposure = gr.Number(
