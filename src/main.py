@@ -49,7 +49,7 @@ def main():
     server.launch()
     
     # Once we are here, we can assume the server was stopped, so we also stop the camera
-    # camera.stop()
+    camera.stop()
 
 if __name__ == "__main__":
     logger.info("Starting up...")
