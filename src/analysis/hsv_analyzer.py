@@ -122,7 +122,8 @@ class HSVAnalyzer:
         self.clear_history()
         
         if self.current_ellipse is not None:
-            self.logger.info(f"Found reference ellipse at {self.current_ellipse[0]} with size {self.current_ellipse[1]}")
+            self.logger.info(f"Found reference ellipse at x = {int(self.current_ellipse[0][0])}, y = {int(self.current_ellipse[0][1])}" +
+            f" with size w = {int(self.current_ellipse[1][0])}, h = {int(self.current_ellipse[1][1])}")
         
     def clear_history(self):
         """Clear all historical data"""
@@ -305,18 +306,18 @@ class HSVAnalyzer:
         if self.hsv_history:
             # Create HSVStats object from the last smoothed values
             self.current_smoothed_stats = HSVStats(
-                h_m=history['h_means'][-1] if history['h_means'] else 0.0,
-                s_m=history['s_means'][-1] if history['s_means'] else 0.0,
-                v_m=history['v_means'][-1] if history['v_means'] else 0.0,
-                h_decay=history['h_decay'][-1] if history['h_decay'] else 0.0,
-                s_decay=history['s_decay'][-1] if history['s_decay'] else 0.0,
-                v_decay=history['v_decay'][-1] if history['v_decay'] else 0.0,
-                dh=history['dH'][-1] if history['dH'] else 0.0,
-                ds=history['dS'][-1] if history['dS'] else 0.0,
-                dv=history['dV'][-1] if history['dV'] else 0.0,
-                ddh=history['ddH'][-1] if history['ddH'] else 0.0,
-                dds=history['ddS'][-1] if history['ddS'] else 0.0,
-                ddv=history['ddV'][-1] if history['ddV'] else 0.0
+                h_m=history['h_means'][-1] if len(history['h_means']) > 0 else 0.0,
+                s_m=history['s_means'][-1] if len(history['s_means']) > 0 else 0.0,
+                v_m=history['v_means'][-1] if len(history['v_means']) > 0 else 0.0,
+                h_decay=history['h_decay'][-1] if len(history['h_decay']) > 0 else 0.0,
+                s_decay=history['s_decay'][-1] if len(history['s_decay']) > 0 else 0.0,
+                v_decay=history['v_decay'][-1] if len(history['v_decay']) > 0 else 0.0,
+                dh=history['dH'][-1] if len(history['dH']) > 0 else 0.0,
+                ds=history['dS'][-1] if len(history['dS']) > 0 else 0.0,
+                dv=history['dV'][-1] if len(history['dV']) > 0 else 0.0,
+                ddh=history['ddH'][-1] if len(history['ddH']) > 0 else 0.0,
+                dds=history['ddS'][-1] if len(history['ddS']) > 0 else 0.0,
+                ddv=history['ddV'][-1] if len(history['ddV']) > 0 else 0.0
             )
             
             # Check thresholds using the smoothed values

@@ -20,7 +20,7 @@ class ImageProcessor:
         h, s, v = cv2.split(hsv_frame)
         
         # If mask is provided, apply it to each channel
-        if mask is not None:
+        if mask is not None and mask.shape == hsv_frame.shape:
             h = cv2.bitwise_and(h, h, mask=mask)
             s = cv2.bitwise_and(s, s, mask=mask)
             v = cv2.bitwise_and(v, v, mask=mask)

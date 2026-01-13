@@ -1,11 +1,17 @@
-from camera.camera import PiCamera
+import sys
+import os
+
+if os.name == "nt":
+        import asyncio
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+from camera.camera import Camera
 from camera.processor import ImageProcessor
 from analysis.hsv_analyzer import HSVAnalyzer
 from web.server import WebServer
 import time
 import threading
 import logging
-import sys
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -22,11 +28,12 @@ def main():
     print(f"Using Python location {sys.executable}")
     
     # Initialize components
-    camera = PiCamera()
+    camera = Camera()
     processor = ImageProcessor()
     analyzer = HSVAnalyzer(processor)
     server = WebServer(camera, analyzer)
     server.find_camera_devices()
+    
     # Start camera
     camera.start()
     
