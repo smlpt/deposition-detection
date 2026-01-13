@@ -2,27 +2,25 @@
 
 ## Overview 
 
-This project aims to create an easy to use interface for monitoring and controlling the injection process of ink onto a liquid surface and to turn off the injection once the saturation point is reached. The idea is to observe relative HSV time series data (hue, saturation, brightness/value) to find the point of saturation. The reference frame should be captured before the injection starts.
+This project aims to create an easy to use interface for monitoring and controlling the injection process of nanomaterial ink onto a liquid surface (also known as Langmuir deposition) and to turn off the injection once the saturation point is reached. The idea is to observe relative color changes as timeseries data (in HSV space: hue, saturation, brightness/value) to find the point of saturation. The reference frame should be captured before the injection starts or at an early stage.
 
 The interface consists of a webserver that currently performs the following tasks:
-- capture a real-time webcam or Raspberry Pi camera feed
+- capture a real-time camera feed. Supported are webcams, Raspberry Pi cameras as well as industrial cameras from [IDS](https://en.ids-imaging.com/downloads.html)
 - perform edge detection and temporally stable ellipse fitting to find the region of interest: in our case this is a cylindrical container
 - capture a reference frame and calculate the (smoothed) relative HSV data for each subsequently captured frame (and their first and second derivatives)
 
 The user interface exposes the following functionality:
-- select the camera device to use
-- change the amount of temporal smoothing applied to the masking ellipse
-- set a masking margin (range 0-1) to discard color changes at the border of the ellipse
-- select which of the captured and calculated timeseries to plot (individual: raw HSV, smoothed HSV, first and second derivatives)
-- select the history size to plot
-- select threshold profiles from the file `profiles.csv`. Threshold conditions in the CSV file can be sparsely populated. If all threshold conditions are met, alert the user visually with a popup. This uses the smoothed values for threshold checking, not the raw values that could fluctuate a lot
-- set an alpha value for decay smoothing. This is a destructive operation and only changes for data points collected after the value was updated
-- set a sliding window smoothing range that is applied to the already smoothed data. First derivatives use this factor x2, second derivatives use x4
-- record the currently streamed frames into a video that will be saved to `./recordings`
-- load a previously recorded video that will replace the current camera stream. After the video finishes, the analysis is paused, and the user can switch back to the camera stream.
-
-> [!Important]
-> Manual exposure and white balance values were only tested on a Raspberry Pi Ubuntu system with a Logitech C920. Other devices are currently not supported for manual exposure control.
+- Select the camera device to use
+- If IDS cameras are selected, expose camera settings for exposure, gamma and white balance corrections
+- Change the amount of temporal smoothing applied to the masking ellipse
+- Set a masking margin (range 0-1) to discard color changes at the border of the ellipse
+- Select which of the captured and calculated timeseries to plot (available as individual channels: raw HSV, smoothed HSV, first and second derivatives)
+- Select the history size to plot
+- Select threshold profiles from the file `profiles.csv`. Threshold conditions in the CSV file can be sparsely populated. If all threshold conditions are met, alert the user visually with a popup. This uses the smoothed values for threshold checking, not the raw values that could fluctuate a lot
+- Set an alpha value for decay smoothing. This is a destructive operation and only changes for data points collected after the value was updated
+- Set a sliding window smoothing range that is applied to the already smoothed data. First derivatives use this factor x2, second derivatives use x4
+- Optionally record the currently streamed frames into a video that will be saved to `./recordings`
+- Load a previously recorded video that will replace the current camera stream. After the video finishes, the analysis is paused, and the user can switch back to the camera stream.
 
 > [!Note]
 > **This is a work in progress. There will be bugs. Some things will not work as intended. Feel free to poke around in the code and submit a PR if you want to help fix things.**
@@ -33,11 +31,12 @@ The user interface exposes the following functionality:
 ## Installation on a desktop computer/laptop
 
 1. Clone this project with `git clone https://github.com/smlpt/deposition-detection`
-2. Ensure that a webcam is connected to your computer
-3. On Windows: launch `launch_server_windows.bat` to launch the server. This will also automatically set up a virtual environment with the required packages on first launch.
+2. Ensure that a webcam or IDS camera is connected to your computer
+3. When using IDS cameras: ensure you installed the correct drivers (easily done with the [extended setup](https://en.ids-imaging.com/downloads.html) for your model)
+4. On Windows: launch `launch_server_windows.bat` to launch the server. This will also automatically set up a virtual environment with the required packages on first launch.
 On Linux, make the shell script executable by running `chmod +x run_project.sh` and then launch `./launch_server_linux.sh`.
-4. Open `http://localhost:7860/` in a browser to access the interface
-5. To stop the server, hit the "close" button in the GUI, or press Ctrl+C in the console.
+5. Open `http://localhost:7860/` in a browser to access the interface
+6. To stop the server, hit the "close" button in the GUI, or press Ctrl+C in the console. You can then close the browser tab.
 
 ## Installation on a Raspberry Pi
 
@@ -48,6 +47,14 @@ On Linux, make the shell script executable by running `chmod +x run_project.sh` 
 5. To stop the server, hit the "close" button in the GUI, or press Ctrl+C in the console.
 
 ## Changelog
+
+### v0.5 Support industral cameras from IDS
+- Detect [IDS cameras](https://en.ids-imaging.com/downloads.html) when any is connected, otherwise resort to normal webcams
+- Expose UI parameters for exposure and gamma correction as well as automatic and custom white balance settings when an IDS camera is selected
+- If you already have the repository cloned, update with `git pull` and delete the `.venv` directory. The launcher will rebuild it on the next start and include the necessary IDS libraries
+- added `ids_test.py`, a standalone script for quickly testing connected IDS cameras
+- added `offline_analysis.ipynb`, a notebook for offline analysis of existing recordings. If you have large raw videos (AVI), you might want to consider downscaling and re-encoding them to MP4/H.264 (e.g. with [Handbrake](https://handbrake.fr/)) for much faster frame analysis
+
 
 ### v0.4 Recording, Loading, Smoothing
 - Allow the user to record videos
@@ -85,3 +92,6 @@ Make sure your browser allows pop-ups.
 
 ### Where are my recorded videos?
 Check in the `./recordings` folder.
+
+### My IDS camera is connected but the interface doesn't pick it up!
+Have you installed the [drivers](https://en.ids-imaging.com/downloads.html) correctly? Double-check you installed them for the correct model. Restart your computer, just in case. If that doesn't help and you get any error messages, open an issue in this repository.
