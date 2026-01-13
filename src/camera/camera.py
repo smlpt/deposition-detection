@@ -107,10 +107,10 @@ class Camera:
                 self.use_ids = True
         except:
             self.use_ids = False
-            self.logger.warning("Failed to initialize IDS camera devices. Maybe incorrect IDS peak & driver installation?" \
+            self.logger.warning(" Failed to initialize IDS camera devices. Maybe incorrect or missing IDS peak & driver installation?" \
             "Resorting to webcam devices only.")
 
-        webcam_count = len(self.ids_devices)
+        webcam_count = len(self.ids_devices) if self.use_ids else 0
         # Check first 5 indexes
         for i in range(5):
             self.logger.debug(f"trying out cam {i}")
