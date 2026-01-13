@@ -10,6 +10,7 @@ if not exist ".\venv\deposition-detection\Scripts\activate.bat" (
     if errorlevel 1 (
         echo Failed to create virtual environment.
         echo We are using Python 3.10 here for compatibility reasons. Make sure it is installed on your system!
+        pause
         exit /b 1
     )
     
@@ -20,6 +21,7 @@ if not exist ".\venv\deposition-detection\Scripts\activate.bat" (
     
     if errorlevel 1 (
         echo Failed to install requirements
+        pause
         exit /b 1
     )
     
