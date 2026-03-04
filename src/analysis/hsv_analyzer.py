@@ -51,7 +51,7 @@ class HSVAnalyzer:
         self.ellipse_score = None
         self.is_ellipse_enabled = True
         self.is_mask_frozen = False
-        self.decay_alpha = 0.95
+        self.decay_alpha = 0.8
 
         self.current_smoothed_stats: HSVStats
 

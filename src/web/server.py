@@ -382,7 +382,7 @@ class WebServer:
                     step=0.1
                 )
                 decay_smoothing = gr.Number(
-                    value=0.95,
+                    value=0.8,
                     label="Decay smoothing",
                     info="0 - no smoothing, 1 - inf. smoothing",
                     minimum=0,
