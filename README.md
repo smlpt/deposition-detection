@@ -7,7 +7,7 @@ This project aims to create an easy to use interface for monitoring and controll
 The interface consists of a webserver that currently performs the following tasks:
 - capture a real-time camera feed. Supported are webcams, Raspberry Pi cameras as well as industrial cameras from [IDS](https://en.ids-imaging.com/downloads.html)
 - perform edge detection and temporally stable ellipse fitting to find the region of interest: in our case this is a cylindrical container
-- capture a reference frame and calculate the (smoothed) relative HSV data for each subsequently captured frame (and their first and second derivatives)
+- capture a reference frame and calculate the (smoothed) relative HSV data for each subsequently captured frame (and their first and second derivatives). Alternatively, plotting the mean differences between frames directly is also supported
 
 The user interface exposes the following functionality:
 - Select the camera device to use
@@ -47,6 +47,12 @@ On Linux, make the shell script executable by running `chmod +x run_project.sh` 
 5. To stop the server, hit the "close" button in the GUI, or press Ctrl+C in the console.
 
 ## Changelog
+
+### v0.6
+- Add toggle to switch between using the mean differences to the previous frames directly for analysis vs. using reference frames
+- Add toggle to use absolute differences for analysis
+- Update offline analysis notebook to include these optional toggles
+
 
 ### v0.5 Support industral cameras from IDS
 - Detect [IDS cameras](https://en.ids-imaging.com/downloads.html) when any is connected, otherwise resort to normal webcams
