@@ -34,6 +34,15 @@ class HSVAnalyzer:
         self.ref_stats = None
         """Reference values for the first frame"""
 
+        self.use_reference_frame = True
+        """If True, use reference frame mode. If False, use previous frame mean mode."""
+
+        self.previous_frame_mean = None
+        """Stores the mean HSV values of the previous frame for non-reference mode"""
+
+        self.use_absolute_difference = False
+        """If True, use absolute difference for decay calculations. If False, use signed difference."""
+
         self.is_paused = False
         
         self.current_mask = None
@@ -42,7 +51,7 @@ class HSVAnalyzer:
         self.ellipse_score = None
         self.is_ellipse_enabled = True
         self.is_mask_frozen = False
-        self.decay_alpha = 0.05
+        self.decay_alpha = 0.8
 
         self.current_smoothed_stats: HSVStats
 
@@ -130,8 +139,25 @@ class HSVAnalyzer:
         
         self.hsv_history.clear()
         
+    def set_use_reference_frame(self, use_reference: bool):
+        """Set whether to use reference frame mode or previous frame mean mode"""
+        self.use_reference_frame = use_reference
+        self.logger.info(f"Analysis mode set to: {'Reference frame' if use_reference else 'Previous frame mean'}")
+        
+        if not use_reference:
+            # When switching to previous frame mean mode, clear ref_stats
+            self.ref_stats = None
+            
+        self.clear_history()
+    
+    def set_use_absolute_difference(self, use_absolute: bool):
+        """Set whether to use absolute difference or signed difference for decay calculations"""
+        self.use_absolute_difference = use_absolute
+        self.logger.info(f"Difference mode set to: {'Absolute' if use_absolute else 'Signed'}")
+        self.clear_history()
+    
     def update(self, frame):
-        """Update with new frame relative to reference frame"""
+        """Update with new frame relative to reference frame or previous frame mean"""
         if self.is_paused:
             return
             
@@ -145,13 +171,40 @@ class HSVAnalyzer:
         # Calculate stats using the mask
         hsv_stats = self.processor.get_hsv_stats(hsv_frame, self.current_mask)
         
-        if self.ref_stats is None:
-            self.ref_stats = hsv_stats
+        # Determine the reference values based on mode
+        if self.use_reference_frame:
+            # Reference frame mode
+            if self.ref_stats is None:
+                self.ref_stats = hsv_stats
+            ref_stats = self.ref_stats
+        else:
+            # Previous frame mean mode
+            if self.previous_frame_mean is None:
+                # First frame: store as previous and return
+                self.previous_frame_mean = {
+                    'h_m': hsv_stats['h_m'],
+                    's_m': hsv_stats['s_m'],
+                    'v_m': hsv_stats['v_m']
+                }
+                return
+            ref_stats = self.previous_frame_mean
+
+        # Calculate difference based on mode
+        if self.use_absolute_difference:
+            # Absolute difference
+            h_diff = abs(hsv_stats['h_m'] - ref_stats['h_m'])
+            s_diff = abs(hsv_stats['s_m'] - ref_stats['s_m'])
+            v_diff = abs(hsv_stats['v_m'] - ref_stats['v_m'])
+        else:
+            # Signed difference
+            h_diff = hsv_stats['h_m'] - ref_stats['h_m']
+            s_diff = hsv_stats['s_m'] - ref_stats['s_m']
+            v_diff = hsv_stats['v_m'] - ref_stats['v_m']
 
         # Calculate new decay values
-        h_decay = self.decay_alpha * (hsv_stats['h_m'] - self.ref_stats['h_m']) + (1 - self.decay_alpha) * (self.hsv_history[-1].h_decay if self.hsv_history else hsv_stats['h_m'] - self.ref_stats['h_m'])
-        s_decay = self.decay_alpha * (hsv_stats['s_m'] - self.ref_stats['s_m']) + (1 - self.decay_alpha) * (self.hsv_history[-1].s_decay if self.hsv_history else hsv_stats['s_m'] - self.ref_stats['s_m'])
-        v_decay = self.decay_alpha * (hsv_stats['v_m'] - self.ref_stats['v_m']) + (1 - self.decay_alpha) * (self.hsv_history[-1].v_decay if self.hsv_history else hsv_stats['v_m'] - self.ref_stats['v_m'])
+        h_decay = (1-self.decay_alpha) * h_diff + self.decay_alpha * (self.hsv_history[-1].h_decay if self.hsv_history else h_diff)
+        s_decay = (1-self.decay_alpha) * s_diff + self.decay_alpha * (self.hsv_history[-1].s_decay if self.hsv_history else s_diff)
+        v_decay = (1-self.decay_alpha) * v_diff + self.decay_alpha * (self.hsv_history[-1].v_decay if self.hsv_history else v_diff)
         
         # Calculate derivatives
         if self.hsv_history:
@@ -166,9 +219,9 @@ class HSVAnalyzer:
             dh = ds = dv = ddh = dds = ddv = 0.0
 
         relative_stats = HSVStats(
-            h_m=hsv_stats['h_m'] - self.ref_stats['h_m'],
-            s_m=hsv_stats['s_m'] - self.ref_stats['s_m'],
-            v_m=hsv_stats['v_m'] - self.ref_stats['v_m'],
+            h_m=h_diff,
+            s_m=s_diff,
+            v_m=v_diff,
             h_decay=h_decay,
             s_decay=s_decay,
             v_decay=v_decay,
@@ -182,6 +235,14 @@ class HSVAnalyzer:
         
         self.hsv_history.append(relative_stats)
         self.timestamps.append(datetime.datetime.now().strftime('%H:%M:%S.%f'))
+        
+        # Update previous frame mean for next iteration (only in previous frame mean mode)
+        if not self.use_reference_frame:
+            self.previous_frame_mean = {
+                'h_m': hsv_stats['h_m'],
+                's_m': hsv_stats['s_m'],
+                'v_m': hsv_stats['v_m']
+            }
     
     def toggle_pause(self, state: bool = None):
         """Toggles between paused and resumed states.

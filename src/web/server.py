@@ -82,10 +82,12 @@ class WebServer:
     def update_history_window(self, new_window):
         """Update the history window size (in seconds)"""
         self.history_window = int(new_window)
-        
-    def set_ellipse_fitting(self, value):
-        self.analyzer.set_ellipse_masking(value)
-        
+
+    def set_use_reference_frame(self, use_reference):
+        self.analyzer.set_use_reference_frame(use_reference)
+        return "New Reference" if use_reference else "Reset History"
+
+   
     def switch_camera(self, device_name: str):
         """Handle camera switch from dropdown"""
         try:
@@ -343,13 +345,24 @@ class WebServer:
                 log_btn = gr.Button("Log timestamp")
                 export_btn = gr.Button("Export CSV")
                 close_btn = gr.Button("Close")
+            with gr.Row():
+                toggle_ellipse = gr.Checkbox(True, label="Enable ellipsoid masking")
+                toggle_ellipse.change(fn=self.analyzer.set_ellipse_masking, inputs=[toggle_ellipse])
+                
+                use_reference_frame = gr.Checkbox(True, label="Use reference frame")
+                use_reference_frame.change(fn=self.set_use_reference_frame, inputs=[use_reference_frame], outputs=[ref_btn])
+                
+                use_absolute_diff = gr.Checkbox(False, label="Use absolute difference")
+                use_absolute_diff.change(fn=self.analyzer.set_use_absolute_difference, inputs=[use_absolute_diff])
+
+                derivative_smoothing = gr.Checkbox(True, label="Enable Derivative Smoothing")
+
+            with gr.Row():
                 camera_select = gr.Dropdown(
                     choices=self.camera_names,
                     value=self.camera_names[0] if self.camera_names else None,
                     label="Select Camera"
                 )
-                toggle_ellipse = gr.Checkbox(True, label="Enable ellipsoid masking")
-                toggle_ellipse.change(fn=self.set_ellipse_fitting, inputs=[toggle_ellipse])
                 
                 history_size = gr.Number(60, label="History in seconds", precision=0, minimum=0, maximum=1800)
                 history_size.change(fn=self.update_history_window, inputs=[history_size])
@@ -369,9 +382,9 @@ class WebServer:
                     step=0.1
                 )
                 decay_smoothing = gr.Number(
-                    value=0.05,
+                    value=0.8,
                     label="Decay smoothing",
-                    info="1 - no smoothing, 0 - inf. smoothing",
+                    info="0 - no smoothing, 1 - inf. smoothing",
                     minimum=0,
                     maximum=1,
                     step=0.01
@@ -380,10 +393,7 @@ class WebServer:
                     fn=lambda x: self.analyzer.__setattr__('decay_alpha', x),
                     inputs=[decay_smoothing]
                 )
-                derivative_smoothing = gr.Checkbox(
-                    value=True,
-                    label="Enable Derivative Smoothing"
-                )
+                
                 derivative_smoothing_window = gr.Number(
                     value=1,
                     label="Smoothing Window",
@@ -393,11 +403,13 @@ class WebServer:
                     precision=0,
                     step=1
                 )
-                derivative_smoothing.change(
+                
+                derivative_smoothing_window.change(
                     fn=self.analyzer.set_derivative_smoothing,
                     inputs=[derivative_smoothing, derivative_smoothing_window]
                 )
-                derivative_smoothing_window.change(
+                
+                derivative_smoothing.change(
                     fn=self.analyzer.set_derivative_smoothing,
                     inputs=[derivative_smoothing, derivative_smoothing_window]
                 )
