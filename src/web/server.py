@@ -5,11 +5,10 @@ from threading import Lock
 import logging
 import time
 from pathlib import Path
-from threading import Lock, Event, Thread
+from threading import Lock, Event
 import cv2
-import numpy as np
-import pandas as pd
 from dataclasses import fields
+import threading
 
 import tkinter as tk
 from tkinter import filedialog
@@ -131,8 +130,8 @@ class WebServer:
         fig = go.Figure()
 
         profile = self.analyzer.current_profile
-        if profile is not None:
-            field_names = [field.name for field in fields(profile) if field.name != 'name']
+        
+        field_names = [field.name for field in fields(profile) if field.name != 'name'] if profile is not None else []
 
         for choice in self.selected_channels:
             fig.add_trace(go.Scatter(y=get_recent(history[self.channel_names[choice]]),
@@ -142,9 +141,8 @@ class WebServer:
             if self.channel_names[choice] in field_names:
                 field_name = self.channel_names[choice]
                 threshold = getattr(profile, field_name)
-                fig.add_hline(y=threshold, line=dict(color=self.col_map[field_name], dash="dash"))
-        
-        
+                if threshold is not None:
+                    fig.add_hline(y=threshold, line=dict(color=self.col_map[field_name], dash="dash"))
 
         fig.update_layout(
             title=f"Relative HSV Changes (Last {self.history_window} seconds)",
@@ -186,16 +184,12 @@ class WebServer:
 
         try:
             
-            # Create root window and hide it
-            root = tk.Tk()
-            root.withdraw()
-            
-            # Open file dialog
-            file_path = filedialog.asksaveasfilename(
+            file_path = _run_file_dialog_sync(lambda root: filedialog.asksaveasfilename(
+                parent=root,
                 defaultextension='.csv',
                 filetypes=[('CSV files', '*.csv')],
                 title='Export HSV Data'
-            )
+            ))
             
             if file_path:
                 with open(file_path, 'w', newline='') as csvfile:
@@ -267,18 +261,12 @@ class WebServer:
             return "Load Video"
         
         try:
-            # Create root window and hide it
-            root = tk.Tk()
-            root.withdraw()
-            
-            # Open file dialog
-            file_path = filedialog.askopenfilename(
+            file_path = _run_file_dialog_sync(lambda root: filedialog.askopenfilename(
+                parent=root,
                 defaultextension='.mp4',
                 filetypes=[('Video files', '*.mp4 *.avi *.mkv *.mov')],
                 title='Load video file for analysis'
-            )
-
-            root.destroy()
+            ))
             
             if file_path:
                 self.logger.info(f" Got video file path {file_path}")
@@ -325,7 +313,7 @@ class WebServer:
         profile_path = current_file_dir / "../profiles.csv"
         if profile_path.exists():
             profile_manager.load_profiles(profile_path)
-            self.analyzer.set_profile(profile_manager.profiles[profile_manager.get_profile_names()[0]])
+            self.analyzer.set_profile(None)
         else:
             self.logger.warning(" No profiles.csv found.")
         
@@ -431,16 +419,20 @@ class WebServer:
                 )
 
                 profile_dropdown = gr.Dropdown(
-                    choices=profile_manager.get_profile_names(),
+                    choices= ["None"] + profile_manager.get_profile_names(),
+                    value = "None",
                     label="Select Profile",
                     multiselect=False,
                     show_label=True
                 )
 
                 def on_profile_selected(profile_name):
-                    profile = profile_manager.get_profile(profile_name)
-                    gr.Info(f"Selected profile: {profile_name}", 2)
-                    self.analyzer.set_profile(profile)
+                    if profile_name == "None":
+                        self.analyzer.set_profile(None)
+                    else:
+                        profile = profile_manager.get_profile(profile_name)
+                        gr.Info(f"Selected profile: {profile_name}", 2)
+                        self.analyzer.set_profile(profile)
 
                 profile_dropdown.change(
                     fn=on_profile_selected,
@@ -555,3 +547,23 @@ class WebServer:
        
         # self.should_stop = True
         demo.queue().launch(theme=gr.themes.Soft(), server_name='0.0.0.0', footer_links=[""])
+
+def _run_file_dialog_sync(dialog_fn):
+    """Run a tkinter file dialog on its own thread and return the result."""
+    result = [None]
+    done = threading.Event()
+
+    def _run():
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.attributes('-topmost', True)  # Bring dialog to front
+        root.withdraw()
+        result[0] = dialog_fn(root)
+        root.destroy()
+        done.set()
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    done.wait()
+    return result[0]

@@ -1,4 +1,3 @@
-from collections import deque
 from dataclasses import dataclass, field
 import datetime, time
 import logging
@@ -75,7 +74,7 @@ class HSVAnalyzer:
     def set_profile(self, profile: ThresholdProfile):
         """Set active threshold profile"""
         self.current_profile = profile
-        self.logger.info(f"Set threshold profile: {profile.name}")
+        self.logger.info(f"Set threshold profile: {profile.name if profile is not None else 'None'}")
 
     def check_thresholds(self, stats: HSVStats) -> bool:
         """Check if current values exceed all thresholds in active profile"""
