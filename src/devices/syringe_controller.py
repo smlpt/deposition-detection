@@ -59,6 +59,7 @@ class SyringeController():
 
     def find_and_set_port(self) -> str | None:
             """Scan all ports, probe each one, store the first working port."""
+            self.logger.info("Probing COM ports to find syringe pump...")
             for port_info in serial.tools.list_ports.comports():
                 name = port_info.device
                 self.logger.debug(f"Probing {name} ({port_info.description})…")
@@ -66,7 +67,6 @@ class SyringeController():
                     self.port = name
                     self.logger.info(f"Syringe pump stored on active port: {self.port}")
                     return self.port
-            self.logger.info("No syringe on any serial port found.")
             return None
 
     def set_port(self, port_name: str) -> bool:
@@ -116,12 +116,31 @@ class SyringeController():
                 return None
 
     def start(self) -> str | None:
-        """Start the pump (RUN command)."""
-        return self._send("RUN")
+        """Start the pump. Returns next button label, or None if command failed."""
+        response = self._send("RUN")
+        if self._is_accepted(response):
+            self.logger.info("Pump started.")
+            return "Stop"
+        self.logger.warning(f"Start command rejected: {repr(response)}")
+        return None
 
     def stop(self) -> str | None:
-        """Stop the pump immediately (STP command)."""
-        return self._send("STP")
+        """Stop the pump. Returns next button label, or None if command failed."""
+        response = self._send("STP")
+        if self._is_accepted(response):
+            self.logger.info("Pump stopped.")
+            return "Start"
+        self.logger.warning(f"Stop command rejected: {repr(response)}")
+        return None
+    
+    def _is_accepted(self, response: str | None) -> bool:
+        """Return True if the pump's response indicates the command was accepted.
+        Accepted responses match the normal status format: e.g. '00S', '00I', '00W'
+        Error responses contain '?' e.g. '00?NA' (not applicable) or '00?OOR' (out of range)
+        """
+        if not response:
+            return False
+        return bool(re.match(r"^\d{2}[SIWA]$", response))
 
     def set_rate(self, rate: float, unit: str = "MM") -> str | None:
         """

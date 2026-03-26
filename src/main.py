@@ -9,6 +9,8 @@ from camera.camera import Camera
 from camera.processor import ImageProcessor
 from analysis.hsv_analyzer import HSVAnalyzer
 from web.server import WebServer
+from devices.syringe_controller import SyringeController
+
 import time
 import threading
 import logging
@@ -31,7 +33,8 @@ def main():
     camera = Camera()
     processor = ImageProcessor()
     analyzer = HSVAnalyzer(processor)
-    server = WebServer(camera, analyzer)
+    syringe = SyringeController() 
+    server = WebServer(camera, analyzer, syringe)
     server.find_camera_devices()
     
     # Start camera

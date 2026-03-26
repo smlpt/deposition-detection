@@ -9,6 +9,7 @@ from threading import Lock, Event
 import cv2
 from dataclasses import fields
 import threading
+import pandas as pd
 
 import tkinter as tk
 from tkinter import filedialog
@@ -19,9 +20,10 @@ from camera.camera import Camera
 from camera.processor import ImageProcessor
 from analysis.profile_manager import ProfileManager
 from analysis.hsv_analyzer import HSVAnalyzer
+from devices.syringe_controller import SyringeController
 
 class WebServer:
-    def __init__(self, camera, analyzer):
+    def __init__(self, camera, analyzer, syringe):
         self.camera: Camera = camera
         self.analyzer: HSVAnalyzer = analyzer
         self.lock = Lock()
@@ -35,6 +37,11 @@ class WebServer:
         self.profile_manager = ProfileManager()
         self.time_since_alert = time.time()
         self.alert_timer: gr.Timer
+
+        self.syringe : SyringeController = syringe
+        self.syringe_found = False
+        self.auto_stop_on_threshold = False
+        self._syringe_row_update = None   # will hold a gr.update to fire once pump is found
         
         self.col_map = {
             "h_means": "#c8d6ae",
@@ -109,12 +116,31 @@ class WebServer:
     def check_alerts(self):
         """Check for threshold alerts and return appropriate UI feedback"""
         if self.analyzer.is_threshold_exceeded:
-            
             gr.Warning(f"Threshold exceeded for {self.analyzer.current_profile.name}!", duration=3)
             if time.time() - self.time_since_alert > 3:
                 self.logger.info(f"Threshold exceeded for {self.analyzer.current_profile.name}!")
                 self.time_since_alert = time.time()
+
+                if self.auto_stop_on_threshold and self.syringe_found:
+                    result = self.syringe.stop()
+                    if result:
+                        gr.Info("Pump automatically stopped due to threshold breach.", 2)
+                        self.logger.info("Syringe auto-stop triggered.")
         return None  # Return None to avoid updating any component
+    
+    def _discover_syringe_async(self):
+        """Run port scan in background; flips syringe_found when done."""
+        def _scan():
+            port = self.syringe.find_and_set_port()
+            if port:
+                if self.syringe.connect():
+                    self.syringe_found = True
+                    self.logger.info(f"Syringe pump ready on {port}.")
+                else:
+                    self.logger.warning("Port found but connection failed.")
+            else:
+                self.logger.info("No syringe pump detected.")
+        threading.Thread(target=_scan, daemon=True).start()
     
         
     def create_plots(self):
@@ -291,9 +317,26 @@ class WebServer:
         except Exception as e:
             self.logger.error(f"Error loading video file: {str(e)}")
             gr.Warning("Error loading video file!", 3)
+
+    def toggle_syringe(self, current_label: str):
+        """Start or stop the pump based on current button label."""
+        if not self.syringe_found:
+            gr.Warning("No syringe pump connected.", 2)
+            return current_label   # leave button unchanged
+
+        if current_label == "Start":
+            result = self.syringe.start()
+        else:
+            result = self.syringe.stop()
+
+        if result is None:
+            gr.Warning("Pump did not accept the command.", 1)
+            return current_label  # don't flip label if command was rejected
+        return result
             
     def shutdown(self):
         self.should_stop = True
+        self.syringe.disconnect()
         gr.close_all(True)
         time.sleep(0.5) # time for threads to clean up
         os._exit(0)
@@ -301,6 +344,8 @@ class WebServer:
     def launch(self):
         """Launch the main webserver, construct the UI and connect methods to the buttons."""
         self.logger.info("Launching webserver...")
+
+        self._discover_syringe_async()
 
         initial_camera = self.camera_names[0] if self.camera_names else ""
         initial_is_ids = initial_camera.startswith("IDS")
@@ -513,6 +558,36 @@ class WebServer:
 
                 auto_wb = gr.Button("Calibrate WB")
                 auto_wb.click(self.camera.calculate_WB, outputs=[red_gain, blue_gain])
+
+            def _check_syringe_row_enabled():
+                """Enables the syringe row once pump is found, polled by a timer."""
+                return gr.update(visible=True) if self.syringe_found else gr.update(visible=False)
+
+
+            syringe_row = gr.Row(visible=False)
+
+            with syringe_row:
+                syringe_toggle = gr.Button("Start")
+                auto_stop_callback = gr.Checkbox(
+                    value=False,
+                    label="Auto-stop on threshold",
+                    interactive=True
+                )
+                auto_stop_callback.change(
+                    fn = lambda v: setattr(self, 'auto_stop_on_threshold', v) or None,
+                    inputs=[auto_stop_callback]
+                )
+
+            syringe_toggle.click(
+                fn=self.toggle_syringe,
+                inputs=[syringe_toggle],   # pass current label in so the method knows state
+                outputs=[syringe_toggle]
+            )
+
+            # Poll every 2 seconds until the pump is found, then show the row
+            syringe_poll_timer = gr.Timer(2.0)
+            syringe_poll_timer.tick(fn=_check_syringe_row_enabled, outputs=[syringe_row])
+                
 
 
             ellipse_smoothing_alpha.change(
