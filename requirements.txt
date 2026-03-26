@@ -9,3 +9,4 @@ jupyter
 ipympl
 ids-peak
 ids_peak_ipl
+pyserial
